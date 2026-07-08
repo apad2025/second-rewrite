@@ -277,7 +277,7 @@ function [snames, DD, HDR, pth_1H, plrange, vout, filelocs] = DogInitialize(pth_
         if dataFLAG.Preprocessed
             if flags.verbose; fprintf('Loading saved data: %s\n', snames.Preprocessed); end
             load(char(fullfile(pth_1H, [snames.Preprocessed, '.mat'])), 'D');
-            load(char(fullfile(pth_1H, 'RawHeader.mat')), 'HDR');
+            load(char(fullfile(pth_1H, 'RAWHeader.mat')), 'HDR');
             filelocs.Preprocessed = idx;
             filelocs.Raw = idx;
             vout{idx} = D;
