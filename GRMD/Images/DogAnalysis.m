@@ -167,15 +167,17 @@ if flags.trimmed && isscalar(D.Flags.Trimmed.ThroughPlane) && ~D.Flags.Trimmed.T
     plrange_tmp{2} = plrange_tmp{2}(ceil(D.Size(2)*0.15)+1:end-ceil(D.Size(2)*0.15));
 
     % Plot data & request input
-    fig = plotmygraph(comb, PlotTitle=['D' num2str(dog) 'D' num2str(date) ' Magnitude'], DataRange=plrange_tmp, IsotropicVoxel=true);
-
-    pause(1)
-    figure(fig)
-    trimFLAG = questdlg('Are there any slices that should be removed prior to data analysis?', ...
-                        'Trim Check', ...
-                        'Yes', 'No', 'No');
-    close
+    % fig = plotmygraph(comb, PlotTitle=['D' num2str(dog) 'D' num2str(date) ' Magnitude'], DataRange=plrange_tmp, IsotropicVoxel=true);
+    % 
+    % pause(1)
+    % figure(fig)
+    % trimFLAG = questdlg('Are there any slices that should be removed prior to data analysis?', ...
+    %                     'Trim Check', ...
+    %                     'Yes', 'No', 'No');
+    % close
     
+    trimFLAG = 'No';
+
     if strcmp(trimFLAG, 'Yes')
         plrange_tmp{3} = 1:D.Size(3);
 
