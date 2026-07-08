@@ -1,0 +1,794 @@
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% Code: Function to perform fat-water separation using a modified version
+% of the graph-cut method (Hernando et al. doi: 10.1002/mrm.22177)
+% Copyright Jorge Campos 2025 - MIT License
+%
+% This code uses tools from the ISMRM fat-water toolbox. For this code to
+% work, make sure to include the toolbox in matlab's directory.
+% Phantom data was acquired in a 3T Philips scanner. Data was acquired
+% enabling 'Delayed Reconstruction'
+
+% This code uses an phase unwrapping (used only to display some results
+% without phase wraps). Performing phase unwrapping is optional, but if
+% used, include in the code directory the function
+% 'qualityGuidedUnwrapping' from ortier and Levesque, DOI 10.1002/mrm.26989, 2017, https://gitlab.com/veronique_fortier/Quality_guided_unwrapping
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+function outParams = Function_Bipolar_GC(imDataParams, algoParams , vec_slices, VERBOSE)
+
+if nargin < 4
+    VERBOSE = false;
+end
+
+% Check validity of params, and set default algorithm parameters if not provided
+[validParams,algoParams] = checkParamsAndSetDefaults_graphcut_Bipolar_GC(imDataParams,algoParams,vec_slices);
+if validParams==0
+    disp('Exiting -- data not processed');
+    outParams = [];
+    return
+end
+
+% The size of the input signal needs to be [3D 1 #echoes], the ones is to
+% represent that the signal corresponds to a single coil (or coil combined
+% image) or [3D #coils #echoes] if coil combination is performed before the
+% fat-water separation
+imDataParams.deltaF = [0; algoParams.gyro*(algoParams.species(2).frequency(:) - algoParams.species(1).frequency(1))*(imDataParams.FieldStrength)];
+
+%% Signal for the acquistion with bipolar gradients and without any correction
+
+% If PrecessionIsClockwise=1 the data is loaded without any modification.
+% If PrecessionIsClockwise=-1 data is changed to follow a consistent
+% convention for the sign of the phase:
+% Complex conjugat of data is used and code set imDataParams.PrecessionIsClockwise = 1
+if imDataParams.PrecessionIsClockwise < 0
+    imDataParams.images = conj(imDataParams.images);
+    imDataParams.PrecessionIsClockwise = 1;
+end
+
+input_signal_bipolar_RO = imDataParams.images;
+
+%% Matrix size and number of voxels
+
+matrix_size = size(input_signal_bipolar_RO,1:3);
+numvox = prod(matrix_size);
+
+%% Number of echoes
+
+numte = size(input_signal_bipolar_RO,5);
+
+%% Echo times for the full bipolar dataset
+
+TEs_bipolar = imDataParams.TE;
+
+%% Binary mask for fat water separation
+
+mask = imDataParams.mask_fwseparation;
+
+%% Memory allocation
+
+% For odd echoes
+odd_echoes = zeros(matrix_size(1),matrix_size(2),matrix_size(3),1,numte/2);
+
+% For even echoes
+even_echoes = zeros(matrix_size(1),matrix_size(2),matrix_size(3),1,numte/2);
+
+% Field maps and R2 star maps
+Water_GC_odd = zeros(size(input_signal_bipolar_RO,1:3));
+Fat_GC_odd = zeros(size(input_signal_bipolar_RO,1:3));
+
+Water_GC_even = zeros(size(input_signal_bipolar_RO,1:3));
+Fat_GC_even = zeros(size(input_signal_bipolar_RO,1:3));
+
+FieldMap_DualGC = zeros(size(input_signal_bipolar_RO,1:3));
+R2_DualGC = zeros(size(input_signal_bipolar_RO,1:3));
+
+Water_bipolar = zeros(size(input_signal_bipolar_RO,1:3));
+Fat_bipolar = zeros(size(input_signal_bipolar_RO,1:3));
+FieldMap_bipolar = zeros(size(input_signal_bipolar_RO,1:3));
+R2_bipolar = zeros(size(input_signal_bipolar_RO,1:3));
+
+%% Graph-cut fat-water separation for odd and even echoes
+if VERBOSE
+    fprintf('Fat-water separation for odd and even echo datasets slice ');
+end
+for kk = vec_slices
+
+    if VERBOSE
+        fprintf([num2str(kk) ', ']);
+    end
+
+    imDataParams.sliceofint = kk;
+    outParams_GC = Function_i2cm1i_3pluspoint_hernando_Bipolar_GC(imDataParams, algoParams, VERBOSE);
+
+    Water_GC_odd(:,:,kk) = outParams_GC.species(1).amps;
+    Fat_GC_odd(:,:,kk) = outParams_GC.species(2).amps;
+
+    Water_GC_even(:,:,kk) = (outParams_GC.species(3).amps);
+    Fat_GC_even(:,:,kk) = (outParams_GC.species(4).amps);
+
+    FieldMap_DualGC(:,:,kk) = outParams_GC.fieldmap;
+    R2_DualGC(:,:,kk) = outParams_GC.r2starmap;
+
+end
+
+%% Fat and water fraction masks generation
+
+slice_image = algoParams.slice_image;
+
+[c_ff, c_wf] = Function_Fat_Quantification_Bipolar_GC( Fat_GC_odd, Water_GC_odd);
+
+c_ff = c_ff.*mask(:,:,:);
+c_ff(c_ff>=1) = 1;
+c_ff(c_ff<=0) = 0;
+
+c_wf = c_wf.*mask(:,:,:);
+c_wf(c_wf>=1) = 1;
+c_wf(c_wf<=0) = 0;
+
+if algoParams.plot_debug
+% Plot to show the initial estimation of the fat fraction
+    
+    figure(101)
+   
+    if algoParams.crameri_colormap 
+        colormap_plot = crameri('-lajolla');
+    else
+        colormap_plot = colormap("hot");
+    end
+
+    fp(1) = subplot(1,2,1);
+    fig_imag = c_wf(:,:,slice_image);
+    imagesc(fig_imag)
+    axis image
+    axis off
+    clim([0 1])
+    colormap(fp(1),colormap_plot);
+    title('Initial Water Map')
+
+    fp(2) = subplot(1,2,2);
+    fig_imag = c_ff(:,:,slice_image);
+    imagesc(fig_imag)
+    axis image
+    axis off
+    clim([0 1])
+    colormap(fp(2),colormap_plot);
+    title('Initial Fat Map')
+end
+
+%% Binary fat and water mask (after thresholding using a specific values included in structure params)
+
+ff = zeros(size(c_ff));
+wf = zeros(size(c_wf));
+
+ff (c_ff>=algoParams.weight) = 1;
+ff (c_ff<algoParams.weight) = 0;
+
+wf = (1 - ff).*mask(:,:,:);
+
+if algoParams.plot_debug
+% Binary mask derived from the initial fat fraction
+
+    figure(102)
+
+    if algoParams.crameri_colormap 
+        colormap_plot = crameri('-lajolla');
+    else
+        colormap_plot = colormap("hot");
+    end
+
+    fp(1) = subplot(1,2,1);
+    fig_imag = ff(:,:,slice_image);
+    imagesc(fig_imag)
+    axis image
+    axis off
+    colormap(fp(1),colormap_plot);
+    title('Fat Mask')
+
+    fp(2) = subplot(1,2,2);
+    fig_imag = wf(:,:,slice_image);
+    imagesc(fig_imag)
+    axis image
+    axis off
+    colormap(fp(2),colormap_plot);
+    title('Water Mask')
+
+end
+
+%% Estimating the error maps using the water and fat signals (these maps are used as initial guesses to determine phase and amplitude effects through an optimization algorithm)
+
+complex_map1_water = (Water_GC_odd.*conj(Water_GC_even))./(Water_GC_odd.*conj(Water_GC_odd));
+complex_map1_fat = (Fat_GC_odd.*conj(Fat_GC_even))./(Fat_GC_odd.*conj(Fat_GC_odd));
+
+complex_map1_combined = (complex_map1_water.^wf .* complex_map1_fat.^ff);
+
+%% Calculation of initial phi and eps maps
+
+phi_map_init = -angle(complex_map1_combined)/2;
+
+eps_map_init = log(abs(complex_map1_combined))/2;
+
+%% Least square solution
+
+options = optimoptions('lsqlin','Algorithm','trust-region-reflective','Display','off');
+
+tik_reg = algoParams.tik_reg;
+
+% Preallocate
+b1 = zeros(size(Water_GC_odd));
+b2 = b1;
+% solution_reg_real = b1;
+% solution_reg_imag = b1;
+
+correction_map = zeros(size(Water_GC_odd));
+display_correction_map = zeros(size(Water_GC_odd));
+
+if VERBOSE
+    tic
+    fprintf('\nPerforming pixel-wise least squares fitting...')
+    reverseStr = '';
+    maxPerc = length(vec_slices)*size(Water_GC_odd,1)*size(Water_GC_odd,2);
+    perc = 0;
+end
+
+for kk = vec_slices
+
+    b1(:,:,kk) = 0.5.*(log(Water_GC_even(:,:,kk)) - log(Water_GC_odd(:,:,kk)));
+    b2(:,:,kk) = 0.5.*(log(Fat_GC_even(:,:,kk)) - log(Fat_GC_odd(:,:,kk)));
+
+    if VERBOSE
+        perc = perc + 1;
+    end
+
+    for xx = 1:size(Water_GC_odd,1)
+        for yy = 1:size(Water_GC_odd,2)
+
+            if VERBOSE
+                reverseStr = UpdatePercent((perc*xx*yy)/maxPerc*100, reverseStr);
+            end
+
+            if mask(xx,yy,kk) == 1
+
+                b = cat(1,wf(xx,yy,kk)*b1(xx,yy,kk),ff(xx,yy,kk)*b2(xx,yy,kk));
+                A = [1i*wf(xx,yy,kk),wf(xx,yy,kk);1i*ff(xx,yy,kk),ff(xx,yy,kk)];
+
+                A_tik = ctranspose(A)*A + tik_reg*eye(2);
+                b_tik = ctranspose(A) * b;
+
+                if tik_reg == 0
+                    solution_reg_real(:,xx,yy) = lsqminnorm(real(A),real(b));
+                    solution_reg_imag(:,xx,yy) = lsqlin(imag(A),imag(b),[],[],[],[],[-pi;-pi],[pi;pi],[phi_map_init(xx,yy,kk);0],options);
+                else
+                    solution_reg_real(:,xx,yy) = lsqminnorm(real(A_tik),real(b_tik));
+                    solution_reg_imag(:,xx,yy) = lsqlin(imag(A_tik),imag(b_tik),[],[],[],[],[-pi;-pi],[pi;pi],[phi_map_init(xx,yy,kk);0],options);
+                end
+
+                correction_map(xx,yy,kk) = 1i*solution_reg_imag(1,xx,yy)+solution_reg_real(2,xx,yy);
+
+                if solution_reg_imag(1,xx,yy)>pi/2
+                    solution_reg_imag(1,xx,yy) = solution_reg_imag(1,xx,yy) - pi;
+                elseif solution_reg_imag(1,xx,yy)<-pi/2
+                    solution_reg_imag(1,xx,yy) = solution_reg_imag(1,xx,yy) + pi;
+                end
+
+                display_correction_map(xx,yy,kk) = 1i*solution_reg_imag(1,xx,yy)+solution_reg_real(2,xx,yy);
+            else
+                correction_map(xx,yy,kk) = 0;
+                display_correction_map(xx,yy,kk) = 0;
+            end
+
+        end
+    end
+
+end
+
+if VERBOSE
+    tttime = toc;
+    fprintf('Done (%.2f sec)', tttime)
+end
+
+% Compute residual for all voxels and all field values
+% Note: the residual is computed in a vectorized way, for increased speed
+phi_map = imag(display_correction_map);
+eps_map = real(display_correction_map);
+
+%% Comparison of initial guess and final solution for phi and eps maps
+
+% This plot shows water and fat specific phase error and amplitude
+% modulation maps and the corresponding maps combined for fat and water
+% mixtures. The final row presents the maps that are used to correct for
+% bipolar induced effects
+
+if algoParams.plot_debug
+
+    figure(103)
+    tiledlayout(2,4,"TileSpacing","compact","Padding","compact")
+
+    if algoParams.crameri_colormap 
+        colormap_paramater = crameri('-grayC');
+    else
+        colormap_paramater = colormap("gray");
+    end
+
+    phi_water = -squeeze(angle(complex_map1_water(:,:,:)))/2;
+
+    phi_fat = -squeeze(angle(complex_map1_fat(:,:,:)))/2;
+
+    eps_water = log(abs(complex_map1_water))/2;
+
+    eps_fat = log(abs(complex_map1_fat))/2;
+
+    phi_mix = -squeeze(angle(complex_map1_combined(:,:,:)))/2;
+
+    eps_mix = log(abs(complex_map1_combined))/2;
+
+    nexttile
+    imagesc(phi_water(:,:,slice_image).*mask(:,:,slice_image))
+    axis image
+    axis off
+    title("Water \phi_{initial}", "Interpreter",'tex')
+
+    nexttile
+    imagesc(phi_fat(:,:,slice_image).*mask(:,:,slice_image))
+    axis image
+    axis off
+    title("Fat \phi_{initial}", "Interpreter",'tex')
+
+    nexttile
+    imagesc(phi_mix(:,:,slice_image).*mask(:,:,slice_image))
+    axis image
+    axis off
+    title("Combined \phi_{initial}", "Interpreter",'tex')
+
+    nexttile
+    fig_imag = phi_map(:,:,slice_image).*mask(:,:,slice_image);
+    fig_imag(mask(:,:,slice_image)==0) = NaN;
+    imagesc(fig_imag)
+    axis image
+    axis off
+    title("\phi_{final}", "Interpreter",'tex')
+    hc = colorbar;
+    clim([-1.5 1.5])
+    ylabel(hc,'[rad]','Units', 'normalized', 'Position', [2.5, 0.5],'Rotation',90);
+
+    nexttile
+    imagesc(eps_water(:,:,slice_image).*mask(:,:,slice_image))
+    axis image
+    axis off
+    clim([-1 1])
+    title("Water \epsilon_{initial}", "Interpreter",'tex')
+
+    nexttile
+    imagesc(eps_fat(:,:,slice_image).*mask(:,:,slice_image))
+    axis image
+    axis off
+    clim([-1 1])
+    title("Fat \epsilon_{initial}", "Interpreter",'tex')
+
+    nexttile
+    imagesc(eps_mix(:,:,slice_image).*mask(:,:,slice_image))
+    axis image
+    axis off
+    clim([-1 1])
+    title("Combined \epsilon_{initial}", "Interpreter",'tex')
+
+    nexttile
+    imagesc(eps_map(:,:,slice_image).*mask(:,:,slice_image))
+    axis image
+    axis off
+    clim([-1 1])
+    title("\epsilon_{final}", "Interpreter",'tex')
+    hc = colorbar;
+    clim([-1 1])
+    ylabel(hc,'[rad]','Units', 'normalized', 'Position', [2.5, 0.5],'Rotation',90);
+    colormap(colormap_paramater)
+end
+
+%% Plot to check results
+
+% These plots show the magnitude and phase results for the fat-water separation
+
+if algoParams.plot_debug
+
+    if algoParams.crameri_colormap 
+        colormap_paramater = crameri('-grayC');
+    else
+        colormap_paramater = colormap("gray");
+    end
+
+    FW_plot = figure(104);
+    FW_tiles = tiledlayout(3,6,"TileSpacing","compact","Padding","compact");
+
+    nexttile(FW_tiles, 1)
+    fig_imag = sqrt(Water_GC_odd(:,:,slice_image).*conj(Water_GC_odd(:,:,slice_image))).*mask(:,:,slice_image);
+    imagesc(fig_imag)
+    axis image
+    axis off
+    title("Water Image (TE_{odd})","Interpreter","tex")
+    hc = colorbar;
+    % clim([0 3000000])
+    ylabel(hc,'[a.u.]','Units', 'normalized', 'Position', [2.5, 0.5],'Rotation',90);
+
+    nexttile(FW_tiles, 7)
+    imagesc(sqrt(Water_GC_even(:,:,slice_image).*conj(Water_GC_even(:,:,slice_image))).*mask(:,:,slice_image))
+    axis image
+    axis off
+    title("Water Image (TE_{even})","Interpreter","tex")
+    hc = colorbar;
+    % clim([0 3000000])
+    ylabel(hc,'[a.u.]','Units', 'normalized', 'Position', [2.5, 0.5],'Rotation',90);
+
+    nexttile(FW_tiles, 2)
+    fig_imag = sqrt(Fat_GC_odd(:,:,slice_image).*conj(Fat_GC_odd(:,:,slice_image))).*mask(:,:,slice_image);
+    imagesc(fig_imag)
+    axis image
+    axis off
+    title("Fat Image (TE_{odd})","Interpreter","tex")
+    hc = colorbar;
+    % clim([0 3000000])
+    ylabel(hc,'[a.u.]','Units', 'normalized', 'Position', [2.5, 0.5],'Rotation',90);
+
+    nexttile(FW_tiles, 8)
+    imagesc(sqrt(Fat_GC_even(:,:,slice_image).*conj(Fat_GC_even(:,:,slice_image))).*mask(:,:,slice_image))
+    axis image
+    axis off
+    title("Fat Image (TE_{even})","Interpreter","tex")
+    hc = colorbar;
+    % clim([0 3000000])
+    ylabel(hc,'[a.u.]','Units', 'normalized', 'Position', [2.5, 0.5],'Rotation',90);
+
+    nexttile(FW_tiles, 3)
+    imagesc(FieldMap_DualGC(:,:,slice_image));
+    axis image
+    axis off
+    title("Field Map Dual GC")
+    hc = colorbar;
+    clim(algoParams.range_fm)
+    ylabel(hc,'[Hz]','Units', 'normalized', 'Position', [2.5, 0.5],'Rotation',90);
+
+    nexttile(FW_tiles, 4)
+    imagesc(R2_DualGC(:,:,slice_image).*mask(:,:,slice_image));
+    axis image
+    axis off
+    title("R_2^* Map Dual GC","Interpreter","tex")
+    hc = colorbar;
+    clim([0 algoParams.range_r2star(2)])
+    ylabel(hc,'[s^{-1}]','Units', 'normalized', 'Position', [2.5, 0.5],'Rotation',90);
+
+    nexttile(FW_tiles, 5)
+    imagesc(phi_map_init(:,:,slice_image).*mask(:,:,slice_image))
+    axis image
+    axis off
+    title("Phase Modulation (TE_2)","Interpreter","tex")
+    hc = colorbar;
+    %clim([0 1])
+    ylabel(hc,'[rad]','Units', 'normalized', 'Position', [2.5, 0.5],'Rotation',90);
+
+    nexttile(FW_tiles, 6)
+    % fig_imag = exp(-1.*eps_map(:,:,slice_image));
+    imagesc(eps_map_init(:,:,slice_image).*mask(:,:,slice_image))
+    axis image
+    axis off
+    title("Amplitude Modulation (TE_2)","Interpreter","tex")
+    hc = colorbar;
+    %clim([0 1.5])
+    ylabel(hc,'[a.u.]','Units', 'normalized', 'Position', [2.5, 0.5],'Rotation',90);
+    colormap(colormap_paramater);
+
+    FW_plot2 = figure(105);
+    FW_tiles2 = tiledlayout(3,6,"TileSpacing","compact","Padding","compact");
+
+    nexttile(FW_tiles2, 1)
+    imagesc(angle(Water_GC_odd(:,:,slice_image)).*mask(:,:,slice_image))
+    axis image
+    axis off
+    title("Water Phase (TE_{odd})","Interpreter","tex")
+    hc = colorbar;
+    %clim([0 1500])
+    ylabel(hc,'[a.u.]','Units', 'normalized', 'Position', [2.5, 0.5],'Rotation',90);
+
+    nexttile(FW_tiles2, 7)
+    imagesc(angle(Water_GC_even(:,:,slice_image)).*mask(:,:,slice_image))
+    axis image
+    axis off
+    title("Water Phase (TE_{even})","Interpreter","tex")
+    hc = colorbar;
+    %clim([0 1500])
+    ylabel(hc,'[a.u.]','Units', 'normalized', 'Position', [2.5, 0.5],'Rotation',90);
+
+    nexttile(FW_tiles2, 2)
+    imagesc(angle(Fat_GC_odd(:,:,slice_image)).*mask(:,:,slice_image))
+    axis image
+    axis off
+    title("Fat Phase (TE_{odd})","Interpreter","tex")
+    hc = colorbar;
+    %clim([0 1500])
+    ylabel(hc,'[a.u.]','Units', 'normalized', 'Position', [2.5, 0.5],'Rotation',90);
+
+    nexttile(FW_tiles2, 8)
+    imagesc(angle(Fat_GC_even(:,:,slice_image)).*mask(:,:,slice_image))
+    axis image
+    axis off
+    title("Fat Phase (TE_{even})","Interpreter","tex")
+    hc = colorbar;
+    %clim([0 1500])
+    ylabel(hc,'[a.u.]','Units', 'normalized', 'Position', [2.5, 0.5],'Rotation',90);
+
+    nexttile(FW_tiles2, 3)
+    imagesc(FieldMap_DualGC(:,:,slice_image));
+    axis image
+    axis off
+    title("Field Map Dual GC")
+    hc = colorbar;
+    clim(algoParams.range_fm)
+    ylabel(hc,'[Hz]','Units', 'normalized', 'Position', [2.5, 0.5],'Rotation',90);
+
+    nexttile(FW_tiles2, 4)
+    imagesc(R2_DualGC(:,:,slice_image).*mask(:,:,slice_image));
+    axis image
+    axis off
+    title("R_2^* Map Dual GC","Interpreter","tex")
+    hc = colorbar;
+    clim([0 algoParams.range_r2star(2)])
+    ylabel(hc,'[s^{-1}]','Units', 'normalized', 'Position', [2.5, 0.5],'Rotation',90);
+
+    nexttile(FW_tiles2, 5)
+    imagesc(phi_map_init(:,:,slice_image).*mask(:,:,slice_image))
+    axis image
+    axis off
+    title("Phase Modulation (TE_2)","Interpreter","tex")
+    hc = colorbar;
+    %clim([0 1])
+    ylabel(hc,'[rad]','Units', 'normalized', 'Position', [2.5, 0.5],'Rotation',90);
+
+    nexttile(FW_tiles2, 6)
+    imagesc(eps_map_init(:,:,slice_image).*mask(:,:,slice_image))
+    axis image
+    axis off
+    title("Amplitude Modulation (TE_2)","Interpreter","tex")
+    hc = colorbar;
+    %clim([0 1.5])
+    ylabel(hc,'[a.u.]','Units', 'normalized', 'Position', [2.5, 0.5],'Rotation',90);
+    colormap(colormap_paramater);
+end
+
+
+%% Correction of phi map and unwrapping
+
+% Unwrapping is included in case that corrections maps present phase wraps.
+% Phase wraps will not affect the fat-water separation, but unwrapping was
+% included in case that user wants to display correction maps without phase
+% wraps. In case of wanting to use phase unwrapping, add to the directory
+% the code from Fortier and Levesque, DOI 10.1002/mrm.26989, 2017, https://gitlab.com/veronique_fortier/Quality_guided_unwrapping
+
+unwrapping = 0;
+
+if unwrapping
+
+    % Allocation of memory for unwrapped map
+    unwrapped_map = zeros(size(eps_map));
+
+    % Unwrapping
+    unwrapped_map(:,:,vec_slices) = qualityGuidedUnwrapping(squeeze(angle(complex_map1_combined(:,:,vec_slices))), squeeze(imDataParams.mask_fwseparation(:,:,vec_slices)), squeeze(abs(complex_map1_combined(:,:,vec_slices))));
+
+    % Calculation of phi map
+    phi_map(:,:,vec_slices) = -unwrapped_map(:,:,vec_slices)/2;
+
+else
+    phi_map = -squeeze(angle(complex_map1_combined(:,:,:)))/2;
+    phi_map(isnan(phi_map))=0;
+end
+
+outParams.bipolar_error_map_theta = phi_map - 1i*eps_map;
+
+%% Total exponential term for correction
+
+total_correction = exp(1i*(phi_map - 1i*eps_map));%exp(2*correction_map).^(1/2);
+
+%% Plot to check results
+
+if algoParams.plot_debug
+    nexttile(FW_tiles, 11)
+    imagesc(angle(total_correction(:,:,slice_image)).*mask(:,:,slice_image))
+    axis image
+    axis off
+    title("Phase Modulation","Interpreter","tex")
+    hc = colorbar;
+    %clim([0 1])
+    ylabel(hc,'[rad]','Units', 'normalized', 'Position', [2.5, 0.5],'Rotation',90);
+
+    nexttile(FW_tiles, 12)
+    imagesc(log(abs(total_correction(:,:,slice_image))).*mask(:,:,slice_image))
+    axis image
+    axis off
+    title("Amplitude Modulation","Interpreter","tex")
+    hc = colorbar;
+    %clim([0 1.5])
+    ylabel(hc,'[a.u.]','Units', 'normalized', 'Position', [2.5, 0.5],'Rotation',90);
+
+    nexttile(FW_tiles2, 11)
+    imagesc(angle(total_correction(:,:,slice_image)).*mask(:,:,slice_image))
+    axis image
+    axis off
+    title("Phase Modulation","Interpreter","tex")
+    hc = colorbar;
+    %clim([0 1])
+    ylabel(hc,'[rad]','Units', 'normalized', 'Position', [2.5, 0.5],'Rotation',90);
+
+    nexttile(FW_tiles2, 12)
+    imagesc(log(abs(total_correction(:,:,slice_image))).*mask(:,:,slice_image))
+    axis image
+    axis off
+    title("Amplitude Modulation","Interpreter","tex")
+    hc = colorbar;
+    %clim([0 1.5])
+    ylabel(hc,'[a.u.]','Units', 'normalized', 'Position', [2.5, 0.5],'Rotation',90);
+end
+
+%% Deconvolving the effect of the errors introduce by the readout
+
+s0 = permute(input_signal_bipolar_RO, [length(size(input_signal_bipolar_RO)) 1:length(size(input_signal_bipolar_RO))-1]);
+s0 = reshape(s0,[numte numvox]);
+
+counter_t = reshape(1:numte,[numte 1]);
+counter_t = repmat(counter_t,[1 numvox]);
+
+total_correction_reshaped = reshape(total_correction,[1 numvox]);
+
+E = repmat(total_correction_reshaped,[numte 1]) .^ ((-1).^(counter_t));
+
+corrected_signal = s0 ./ (E);
+
+corrected_signal = permute(corrected_signal,[2 1]);
+
+corrected_bipolar_signal = reshape(corrected_signal,matrix_size(1),matrix_size(2),matrix_size(3),1,numte);
+
+%% Fat water separation of the corrected signal
+
+algoParams.DO_OT = 0;
+
+imDataParams.TE = TEs_bipolar;
+
+if VERBOSE
+    tic
+    fprintf('Fat-water separation in synthetic unipolar dataset slice ');
+end
+for kk = vec_slices
+
+    if VERBOSE
+        fprintf([num2str(kk) ', ']);
+    end
+    imDataParams.images = corrected_bipolar_signal(:,:,kk,:,:); % Originaly size[nx,ny,nz,ncoils,nechoes] Note: This specific order is required for GC algorithm
+
+    outParams_bipolar = fw_i2cm1i_3pluspoint_hernando_graphcut(imDataParams, algoParams, false);
+
+    Water_bipolar(:,:,kk) = outParams_bipolar.species(1).amps;
+    Fat_bipolar(:,:,kk) = outParams_bipolar.species(2).amps;
+    FieldMap_bipolar(:,:,kk) = outParams_bipolar.fieldmap;
+    R2_bipolar(:,:,kk) = outParams_bipolar.r2starmap;
+
+    %slice_image = sliceNb_ROI;%1;
+end
+if VERBOSE
+    tttime = toc;
+    fprintf('. Done (%.2f sec)', tttime)
+end
+
+%% Figure to check the results
+
+if algoParams.plot_debug
+
+    nexttile(FW_tiles, 13)
+    imagesc(abs(Water_bipolar(:,:,slice_image)).*mask(:,:,slice_image));
+    axis image
+    axis off
+    title("Water Image")
+    hc = colorbar;
+    % clim([0 3000000])
+    ylabel(hc,'[a.u.]','Units', 'normalized', 'Position', [2.5, 0.5],'Rotation',90);
+
+    nexttile(FW_tiles, 14)
+    imagesc(abs(Fat_bipolar(:,:,slice_image)).*mask(:,:,slice_image));
+    axis image
+    axis off
+    title("Fat Image")
+    hc = colorbar;
+    % clim([0 3000000])
+    ylabel(hc,'[a.u.]','Units', 'normalized', 'Position', [2.5, 0.5],'Rotation',90);
+
+    nexttile(FW_tiles, 15)
+    imagesc(FieldMap_bipolar(:,:,slice_image));
+    axis image
+    axis off
+    title("Field Map")
+    hc = colorbar;
+    clim(algoParams.range_fm)
+    ylabel(hc,'[Hz]','Units', 'normalized', 'Position', [2.5, 0.5],'Rotation',90);
+
+    nexttile(FW_tiles, 16)
+    imagesc(R2_bipolar(:,:,slice_image).*mask(:,:,slice_image));
+    axis image
+    axis off
+    title("R_2^* Map","Interpreter","tex")
+    hc = colorbar;
+    clim([0 algoParams.range_r2star(2)])
+    ylabel(hc,'[s^{-1}]','Units', 'normalized', 'Position', [2.5, 0.5],'Rotation',90);
+
+    nexttile(FW_tiles2, 13)
+    imagesc(angle(Water_bipolar(:,:,slice_image)).*mask(:,:,slice_image));
+    axis image
+    axis off
+    title("Water Phase")
+    hc = colorbar;
+    %clim([0 1500])
+    ylabel(hc,'[a.u.]','Units', 'normalized', 'Position', [2.5, 0.5],'Rotation',90);
+
+    nexttile(FW_tiles2, 14)
+    imagesc(angle(Fat_bipolar(:,:,slice_image)).*mask(:,:,slice_image));
+    axis image
+    axis off
+    title("Fat Phase")
+    hc = colorbar;
+    %clim([0 1500])
+    ylabel(hc,'[a.u.]','Units', 'normalized', 'Position', [2.5, 0.5],'Rotation',90);
+
+    nexttile(FW_tiles2, 15)
+    imagesc(FieldMap_bipolar(:,:,slice_image));
+    axis image
+    axis off
+    title("Field Map")
+    hc = colorbar;
+    % clim([-30 30])
+    ylabel(hc,'[Hz]','Units', 'normalized', 'Position', [2.5, 0.5],'Rotation',90);
+
+    nexttile(FW_tiles2, 16)
+    imagesc(R2_bipolar(:,:,slice_image).*mask(:,:,slice_image));
+    axis image
+    axis off
+    title("R_2^* Map","Interpreter","tex")
+    hc = colorbar;
+    %clim([0 100])
+    ylabel(hc,'[s^{-1}]','Units', 'normalized', 'Position', [2.5, 0.5],'Rotation',90);
+end
+
+%% Creating the output for the function
+
+% Water signal for fat-water separation using all echoes
+outParams.species(1).amps = Water_bipolar;
+
+% Fat signal for fat-water separation using all echoes
+outParams.species(2).amps = Fat_bipolar;
+
+% R2 star map using all echoes
+outParams.r2starmap = R2_bipolar;
+
+% Field map using all echoes
+outParams.fieldmap = FieldMap_bipolar;
+
+% Phi map (related to phase modulation due to bipolar readout)
+outParams.phi_map = phi_map;
+
+% Epsilon map (related to amplitude modulation due to bipolar readout)
+outParams.eps_map = eps_map;
+
+% Corrected signal: bipolar signal transformed into the unipolar equivalent
+outParams.corrected_bipolar_signal = corrected_bipolar_signal;
+
+% Correction to remove bipolar induced effects
+outParams.total_correction = total_correction;
+
+% Results from dualGC odd and even echoes
+outParams.Water_GC_odd = Water_GC_odd;
+outParams.Fat_GC_odd = Fat_GC_odd;
+outParams.Water_GC_even = Water_GC_even;
+outParams.Fat_GC_even = Fat_GC_even;
+outParams.FieldMap_DualGC = FieldMap_DualGC;
+outParams.R2_DualGC = R2_DualGC;
+end
+
+% Update display percentage
+function revstr = UpdatePercent(perc, revstr)
+    msg = sprintf('%.2f percent. ', perc);
+    fprintf([revstr, msg]);
+    revstr = repmat(sprintf('\b'), 1, length(msg));
+end
