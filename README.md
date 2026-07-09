@@ -90,8 +90,34 @@ to
 
 Note: `pth_data` here MUST match `mainpth` in `dogexplorer.m` (line 1559). If the data root moves, update both.
 
-Add two `addpath` lines (after the path variables) so the code and its dependencies are on the MATLAB path:
+Add three `addpath` lines (after the path variables) so the code and its dependencies are on the MATLAB path:
 ```matlab
 addpath(genpath(pth_code))                                 % GRMD
 addpath(genpath("/scratch/user/apad/CREAM_PDFF/hernando")) % hernando
+addpath(genpath("/scratch/user/apad/functions"))           % external utilities (loadima, get_echoMIP, GenPlotRange, plotmygraph, ...)
 ```
+
+## loadima.m
+DICOM file paths were built with a hardcoded backslash separator, which fails on Linux (only the raw-DICOM preprocessing path hits this; it is skipped when preprocessed `.mat` files already exist). Change lines 206, 207, 209, 210, 226, 227, 229, 230 from
+```matlab
+data(:,:,:,j)   = dicomread([dcm '\' filelist(j).name]);
+hdr(j)          = dicominfo([dcm '\' filelist(j).name]);
+data_p(:,:,:,j) = dicomread([dcm_p '\' filelist_p(j).name]);
+hdr_tmp         = dicominfo([dcm_p '\' filelist_p(j).name]);
+data(:,:,i,j)   = dicomread([dcm '\' filelist(idx).name]);
+hdr(i,j)        = dicominfo([dcm '\' filelist(idx).name]);
+data_p(:,:,i,j) = dicomread([dcm_p '\' filelist_p(idx).name]);
+hdr_tmp         = dicominfo([dcm_p '\' filelist_p(idx).name]);
+```
+to use `fullfile`, e.g.
+```matlab
+data(:,:,:,j)   = dicomread(fullfile(dcm, filelist(j).name));
+hdr(j)          = dicominfo(fullfile(dcm, filelist(j).name));
+data_p(:,:,:,j) = dicomread(fullfile(dcm_p, filelist_p(j).name));
+hdr_tmp         = dicominfo(fullfile(dcm_p, filelist_p(j).name));
+data(:,:,i,j)   = dicomread(fullfile(dcm, filelist(idx).name));
+hdr(i,j)        = dicominfo(fullfile(dcm, filelist(idx).name));
+data_p(:,:,i,j) = dicomread(fullfile(dcm_p, filelist_p(idx).name));
+hdr_tmp         = dicominfo(fullfile(dcm_p, filelist_p(idx).name));
+```
+Leave line 64 (`strsplit(hdr.ImageType,'\')`) unchanged — that backslash is the DICOM `ImageType` field delimiter, not a filesystem path.
