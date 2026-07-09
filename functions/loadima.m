@@ -203,11 +203,11 @@ if folderFLAG
     if d3FLAG
         for j = 1:msize(4)
             reverseStr = UpdatePercent((j/msize(4))*100, reverseStr);
-            data(:,:,:,j) = dicomread([dcm '\' filelist(j).name]);
-            hdr(j) = dicominfo([dcm '\' filelist(j).name]);
+            data(:,:,:,j) = dicomread(fullfile(dcm, filelist(j).name));
+            hdr(j) = dicominfo(fullfile(dcm, filelist(j).name));
             if complexFLAG
-                data_p(:,:,:,j) = dicomread([dcm_p '\' filelist_p(j).name]);
-                hdr_tmp = dicominfo([dcm_p '\' filelist_p(j).name]);
+                data_p(:,:,:,j) = dicomread(fullfile(dcm_p, filelist_p(j).name));
+                hdr_tmp = dicominfo(fullfile(dcm_p, filelist_p(j).name));
                 if isfield(hdr_tmp, 'RescaleSlope')
                     RSslp(:,j) = hdr_tmp.RescaleSlope;
                     RSint(:,j) = hdr_tmp.RescaleIntercept;
@@ -223,11 +223,11 @@ if folderFLAG
             for j = 1:msize(4)
                 idx = idx + 1;
                 reverseStr = UpdatePercent((idx/(msize(3)*msize(4)))*100, reverseStr);
-                data(:,:,i,j) = dicomread([dcm '\' filelist(idx).name]);
-                hdr(i,j) = dicominfo([dcm '\' filelist(idx).name]);
+                data(:,:,i,j) = dicomread(fullfile(dcm, filelist(idx).name));
+                hdr(i,j) = dicominfo(fullfile(dcm, filelist(idx).name));
                 if complexFLAG
-                    data_p(:,:,i,j) = dicomread([dcm_p '\' filelist_p(idx).name]);
-                    hdr_tmp = dicominfo([dcm_p '\' filelist_p(idx).name]);
+                    data_p(:,:,i,j) = dicomread(fullfile(dcm_p, filelist_p(idx).name));
+                    hdr_tmp = dicominfo(fullfile(dcm_p, filelist_p(idx).name));
                     if isfield(hdr_tmp, 'RescaleSlope')
                         RSslp(i,j) = hdr_tmp.RescaleSlope;
                         RSint(i,j) = hdr_tmp.RescaleIntercept;
