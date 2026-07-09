@@ -90,11 +90,12 @@ to
 
 Note: `pth_data` here MUST match `mainpth` in `dogexplorer.m` (line 1559). If the data root moves, update both.
 
-Add three `addpath` lines (after the path variables) so the code and its dependencies are on the MATLAB path:
+Add four `addpath` lines (after the path variables) so the code and its dependencies are on the MATLAB path:
 ```matlab
 addpath(genpath(pth_code))                                 % GRMD
 addpath(genpath("/scratch/user/apad/CREAM_PDFF/hernando")) % hernando
 addpath(genpath("/scratch/user/apad/functions"))           % external utilities (loadima, get_echoMIP, GenPlotRange, plotmygraph, ...)
+addpath(genpath("/scratch/user/apad/bipolar_fat_water_separation")) % Function_Bipolar_GC (BipolarIGC slice separation)
 ```
 
 ## loadima.m
