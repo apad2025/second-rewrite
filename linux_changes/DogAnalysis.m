@@ -7,6 +7,10 @@ clear; clc; close all
 pth_data = "/scratch/user/apad/Fat_water_separation/DICOM_Files";   % location of DD.mat (MUST match dogexplorer's mainpth)
 pth_code = "/scratch/user/apad/GRMD";                               % code root (kept for reference)
 
+% Add code to the MATLAB path
+addpath(genpath(pth_code))                                 % GRMD
+addpath(genpath("/scratch/user/apad/CREAM_PDFF/hernando")) % hernando
+
 % Select dog & date (high PDFF are 4,3 & 2,3) (3,3 isn't finished being processed)
 % 1 - Waylon
 % 2 - Sushi

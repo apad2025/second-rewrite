@@ -89,3 +89,9 @@ to
 ```
 
 Note: `pth_data` here MUST match `mainpth` in `dogexplorer.m` (line 1559). If the data root moves, update both.
+
+Add two `addpath` lines (after the path variables) so the code and its dependencies are on the MATLAB path:
+```matlab
+addpath(genpath(pth_code))                                 % GRMD
+addpath(genpath("/scratch/user/apad/CREAM_PDFF/hernando")) % hernando
+```
