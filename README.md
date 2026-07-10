@@ -1,6 +1,9 @@
 # Changes
-- Add GRMD to MATLAB path
-- Add Hernando to path
+- Add each to the MATLAB path
+    - GRMD
+    - hernando
+    - functions
+    - bipolar_fat_water_separation
 - Change line 1559 `mainpth` variable in `dogexplorer.m`
 - Rerun `dogexplorer.m` to regenerage `DD.mat`
 - Change line 7 in `DogAnalysis.m`
