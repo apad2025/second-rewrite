@@ -52,7 +52,7 @@ function algoParams = grabPars(flags)
             algoParams.LMAP_EXTRA            = 0.05;            % More smoothing for low-signal regions
             algoParams.TRY_PERIODIC_RESIDUAL = 0;               % Take advantage of periodic residual if uniform TEs (will change range_fm)  
             algoParams.tik_reg               = 0;               % Tikhonov regularization binary flag
-            algoParams.plot_debug            = true;
+            algoParams.plot_debug            = false;
 
         case 'vlGC'
             % Algorithm-specific parameters
