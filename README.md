@@ -1,14 +1,29 @@
 # Changes
-- Add each to the MATLAB path
+- If on Windows, manually add each to the MATLAB path
     - GRMD
     - hernando
     - functions
     - bipolar_fat_water_separation
 - Change line 1559 `mainpth` variable in `dogexplorer.m`
 - Rerun `dogexplorer.m` to regenerage `DD.mat`
-- Change line 7 in `DogAnalysis.m`
 - Change line 8 in `processeddogdata.m`
-- Comment out Bipolar correction lines 269-315, Unwrap data lines 316-357, lines 374-406, Check for fat/water swaps - automatic lines 411-439, Check for fat/water swaps - manual lines 440-575, and lines 578 and 579 
+- In `DogAnalysis.m`:
+    - Set `pth_data` to the same path as `mainpth` in `dogexplorer.m`
+    - Set `pth_code` to the GRMD folder
+
+Comment out the following in `DogAnalysis.m`:
+- `pth_main` since it is unused
+- **Bipolar correction** lines 269-315
+- **Unwrap data** lines 316-357
+- Lines 376-406
+    - `dfat = -3.5*D.F0;` to `D.CSCorrection.FatWaterSwapChecked.Automatic = true;`
+- **Check for fat/water swaps - automatic** lines 411-439
+- **Check for fat/water swaps - manual** lines 440-575
+- Lines 578 and 579:
+```matlab
+fields2rm = {'Image', 'WeightedMagnitude'};
+if isfield(D.Data, 'Image'), D.Data = rmfield(D.Data, 'Image'); end
+```
 
 # Linux only changes
 ## dogexplorer.m
