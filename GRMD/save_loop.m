@@ -5,31 +5,17 @@ clear; clc; close all
 slice = 12;
 
 % Drop all fields except Data
-myslice = "C:\Users\apad2\OneDrive\Desktop\mat_backup\FWbigc_zip.mat";
-S = load(myslice, 'D');
-Data = S.D.Data;
-save(myslice, 'Data');
+path = "C:\Users\apad2\Desktop\second_rewrite\results\FWbigc_zip.mat";
+Data = load(path, 'D').D.Data;
+save(path, 'Data');
 
 % loop over Data and trim down each array
-clear myslice;
-myslice = load("C:\Users\apad2\OneDrive\Desktop\mat_backup\FWbigc_zip.mat");
-path = "C:\Users\apad2\OneDrive\Desktop\mat_backup\FWbigc_zip.mat";
-Data = myslice.Data;
 fnames = fieldnames(Data);
-
-Data.(fnames{1}) = Data.(fnames{1})(:,:,slice);
-for i = 3:6
+for i = [1, 3:6, 8:14]
     Data.(fnames{i}) = Data.(fnames{i})(:,:,slice);
 end
-
-for i = 8:14
-    Data.(fnames{i}) = Data.(fnames{i})(:,:,slice);
+for i = 1:2
+    Data.species(i).amps = Data.species(i).amps(:,:,slice);
 end
-
-% trim species
-Data.species(1).amps = Data.species(1).amps(:,:,slice);
-Data.species(2).amps = Data.species(2).amps(:,:,slice);
-
-% trim corrected_bipolar
 Data.corrected_bipolar_signal = Data.corrected_bipolar_signal(:,:,slice,:,:);
-save(path, "Data");
+save(path, 'Data');
