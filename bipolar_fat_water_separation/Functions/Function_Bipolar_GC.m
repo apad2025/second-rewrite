@@ -67,30 +67,24 @@ mask = imDataParams.mask_fwseparation;
 
 %% Memory allocation
 
-% For odd echoes
-odd_echoes = zeros(matrix_size(1),matrix_size(2),matrix_size(3),1,numte/2);
-
-% For even echoes
-even_echoes = zeros(matrix_size(1),matrix_size(2),matrix_size(3),1,numte/2);
-
 % Field maps and R2 star maps
-Water_GC_odd = zeros(size(input_signal_bipolar_RO,1:3));
-Fat_GC_odd = zeros(size(input_signal_bipolar_RO,1:3));
+Water_GC_odd = zeros(size(input_signal_bipolar_RO,1:numte/2));
+Fat_GC_odd = Water_GC_odd;
 
-Water_GC_even = zeros(size(input_signal_bipolar_RO,1:3));
-Fat_GC_even = zeros(size(input_signal_bipolar_RO,1:3));
+Water_GC_even = Water_GC_odd;
+Fat_GC_even = Water_GC_odd;
 
-FieldMap_DualGC = zeros(size(input_signal_bipolar_RO,1:3));
-R2_DualGC = zeros(size(input_signal_bipolar_RO,1:3));
+FieldMap_DualGC = Water_GC_odd;
+R2_DualGC = Water_GC_odd;
 
-Water_bipolar = zeros(size(input_signal_bipolar_RO,1:3));
-Fat_bipolar = zeros(size(input_signal_bipolar_RO,1:3));
-FieldMap_bipolar = zeros(size(input_signal_bipolar_RO,1:3));
-R2_bipolar = zeros(size(input_signal_bipolar_RO,1:3));
+Water_bipolar = Water_GC_odd;
+Fat_bipolar = Water_GC_odd;
+FieldMap_bipolar = Water_GC_odd;
+R2_bipolar = Water_GC_odd;
 
 %% Graph-cut fat-water separation for odd and even echoes
 if VERBOSE
-    fprintf('Fat-water separation for odd and even echo datasets slice ');
+    fprintf('\nFat-water separation for odd and even echo datasets slice ');
 end
 for kk = vec_slices
 
@@ -159,11 +153,11 @@ end
 %% Binary fat and water mask (after thresholding using a specific values included in structure params)
 
 ff = zeros(size(c_ff));
-wf = zeros(size(c_wf));
 
 ff (c_ff>=algoParams.weight) = 1;
 ff (c_ff<algoParams.weight) = 0;
 
+ff = ff.*mask(:,:,:);
 wf = (1 - ff).*mask(:,:,:);
 
 if algoParams.plot_debug
@@ -178,16 +172,14 @@ if algoParams.plot_debug
     end
 
     fp(1) = subplot(1,2,1);
-    fig_imag = ff(:,:,slice_image);
-    imagesc(fig_imag)
+    imagesc(ff(:,:,slice_image))
     axis image
     axis off
     colormap(fp(1),colormap_plot);
     title('Fat Mask')
 
     fp(2) = subplot(1,2,2);
-    fig_imag = wf(:,:,slice_image);
-    imagesc(fig_imag)
+    imagesc(wf(:,:,slice_image))
     axis image
     axis off
     colormap(fp(2),colormap_plot);
@@ -217,69 +209,57 @@ tik_reg = algoParams.tik_reg;
 % Preallocate
 b1 = zeros(size(Water_GC_odd));
 b2 = b1;
-% solution_reg_real = b1;
-% solution_reg_imag = b1;
-
-correction_map = zeros(size(Water_GC_odd));
-display_correction_map = zeros(size(Water_GC_odd));
+b = zeros([2 size(Water_GC_odd)]);
+solution_reg_real = b;
+solution_reg_imag = b;
+correction_map_unwrapped = b1;
+correction_map = b1;
 
 if VERBOSE
     tic
     fprintf('\nPerforming pixel-wise least squares fitting...')
     reverseStr = '';
-    maxPerc = length(vec_slices)*size(Water_GC_odd,1)*size(Water_GC_odd,2);
+    maxPerc = length(vec_slices)*size(Water_GC_odd,1);
     perc = 0;
 end
 
+b1(:,:,vec_slices) = 0.5.*(log(Water_GC_even(:,:,vec_slices)) - log(Water_GC_odd(:,:,vec_slices)));
+b2(:,:,vec_slices) = 0.5.*(log(Fat_GC_even(:,:,vec_slices)) - log(Fat_GC_odd(:,:,vec_slices)));
+b(:,:,:,vec_slices) = cat(1, reshape(wf(:,:,vec_slices).*b1(:,:,vec_slices), [1 size(wf(:,:,vec_slices))]), reshape(ff(:,:,vec_slices).*b2(:,:,vec_slices), [1 size(wf(:,:,vec_slices))]));
+
 for kk = vec_slices
-
-    b1(:,:,kk) = 0.5.*(log(Water_GC_even(:,:,kk)) - log(Water_GC_odd(:,:,kk)));
-    b2(:,:,kk) = 0.5.*(log(Fat_GC_even(:,:,kk)) - log(Fat_GC_odd(:,:,kk)));
-
-    if VERBOSE
-        perc = perc + 1;
-    end
-
     for xx = 1:size(Water_GC_odd,1)
+        if VERBOSE 
+            perc = perc + 1;
+            reverseStr = UpdatePercent(perc/maxPerc*100, reverseStr);
+        end
+
         for yy = 1:size(Water_GC_odd,2)
-
-            if VERBOSE
-                reverseStr = UpdatePercent((perc*xx*yy)/maxPerc*100, reverseStr);
-            end
-
             if mask(xx,yy,kk) == 1
 
-                b = cat(1,wf(xx,yy,kk)*b1(xx,yy,kk),ff(xx,yy,kk)*b2(xx,yy,kk));
                 A = [1i*wf(xx,yy,kk),wf(xx,yy,kk);1i*ff(xx,yy,kk),ff(xx,yy,kk)];
 
                 A_tik = ctranspose(A)*A + tik_reg*eye(2);
-                b_tik = ctranspose(A) * b;
+                b_tik = ctranspose(A) * b(:,xx,yy,kk);
 
                 if tik_reg == 0
-                    solution_reg_real(:,xx,yy) = lsqminnorm(real(A),real(b));
-                    solution_reg_imag(:,xx,yy) = lsqlin(imag(A),imag(b),[],[],[],[],[-pi;-pi],[pi;pi],[phi_map_init(xx,yy,kk);0],options);
+                    solution_reg_real(:,xx,yy,kk) = lsqminnorm(real(A),real(b(:,xx,yy,kk)));
+                    solution_reg_imag(:,xx,yy,kk) = lsqlin(imag(A),imag(b(:,xx,yy,kk)),[],[],[],[],[-pi;-pi],[pi;pi],[phi_map_init(xx,yy,kk);0],options);
                 else
-                    solution_reg_real(:,xx,yy) = lsqminnorm(real(A_tik),real(b_tik));
-                    solution_reg_imag(:,xx,yy) = lsqlin(imag(A_tik),imag(b_tik),[],[],[],[],[-pi;-pi],[pi;pi],[phi_map_init(xx,yy,kk);0],options);
+                    solution_reg_real(:,xx,yy,kk) = lsqminnorm(real(A_tik),real(b_tik));
+                    solution_reg_imag(:,xx,yy,kk) = lsqlin(imag(A_tik),imag(b_tik),[],[],[],[],[-pi;-pi],[pi;pi],[phi_map_init(xx,yy,kk);0],options);
                 end
-
-                correction_map(xx,yy,kk) = 1i*solution_reg_imag(1,xx,yy)+solution_reg_real(2,xx,yy);
-
-                if solution_reg_imag(1,xx,yy)>pi/2
-                    solution_reg_imag(1,xx,yy) = solution_reg_imag(1,xx,yy) - pi;
-                elseif solution_reg_imag(1,xx,yy)<-pi/2
-                    solution_reg_imag(1,xx,yy) = solution_reg_imag(1,xx,yy) + pi;
-                end
-
-                display_correction_map(xx,yy,kk) = 1i*solution_reg_imag(1,xx,yy)+solution_reg_real(2,xx,yy);
-            else
-                correction_map(xx,yy,kk) = 0;
-                display_correction_map(xx,yy,kk) = 0;
             end
-
         end
     end
 
+    correction_map_unwrapped(:,:,kk) = squeeze(1i.*solution_reg_imag(1,:,:,kk) + solution_reg_real(2,:,:,kk));
+
+    % Apply artificial wrap
+    solution_reg_imag2 = squeeze(solution_reg_imag(1,:,:,kk));
+    solution_reg_imag2(solution_reg_imag2>pi/2) = solution_reg_imag2(solution_reg_imag2>pi/2) - pi;
+    solution_reg_imag2(solution_reg_imag2<-pi/2) = solution_reg_imag2(solution_reg_imag2<-pi/2) + pi;
+    correction_map(:,:,kk) = 1i.*solution_reg_imag2 + squeeze(solution_reg_real(2,:,:,kk));
 end
 
 if VERBOSE
@@ -289,8 +269,14 @@ end
 
 % Compute residual for all voxels and all field values
 % Note: the residual is computed in a vectorized way, for increased speed
-phi_map = imag(display_correction_map);
-eps_map = real(display_correction_map);
+phi_map = imag(correction_map);
+eps_map = real(correction_map);
+
+outParams.bipolar_error_map_theta = phi_map - 1i*eps_map;
+
+%% Total exponential term for correction
+
+total_correction = exp(1i*(phi_map - 1i*eps_map));%exp(2*correction_map).^(1/2);
 
 %% Comparison of initial guess and final solution for phi and eps maps
 
@@ -318,10 +304,6 @@ if algoParams.plot_debug
 
     eps_fat = log(abs(complex_map1_fat))/2;
 
-    phi_mix = -squeeze(angle(complex_map1_combined(:,:,:)))/2;
-
-    eps_mix = log(abs(complex_map1_combined))/2;
-
     nexttile
     imagesc(phi_water(:,:,slice_image).*mask(:,:,slice_image))
     axis image
@@ -335,7 +317,7 @@ if algoParams.plot_debug
     title("Fat \phi_{initial}", "Interpreter",'tex')
 
     nexttile
-    imagesc(phi_mix(:,:,slice_image).*mask(:,:,slice_image))
+    imagesc(phi_map_init(:,:,slice_image).*mask(:,:,slice_image))
     axis image
     axis off
     title("Combined \phi_{initial}", "Interpreter",'tex')
@@ -366,7 +348,7 @@ if algoParams.plot_debug
     title("Fat \epsilon_{initial}", "Interpreter",'tex')
 
     nexttile
-    imagesc(eps_mix(:,:,slice_image).*mask(:,:,slice_image))
+    imagesc(eps_map_init(:,:,slice_image).*mask(:,:,slice_image))
     axis image
     axis off
     clim([-1 1])
@@ -400,8 +382,7 @@ if algoParams.plot_debug
     FW_tiles = tiledlayout(3,6,"TileSpacing","compact","Padding","compact");
 
     nexttile(FW_tiles, 1)
-    fig_imag = sqrt(Water_GC_odd(:,:,slice_image).*conj(Water_GC_odd(:,:,slice_image))).*mask(:,:,slice_image);
-    imagesc(fig_imag)
+    imagesc(sqrt(Water_GC_odd(:,:,slice_image).*conj(Water_GC_odd(:,:,slice_image))).*mask(:,:,slice_image))
     axis image
     axis off
     title("Water Image (TE_{odd})","Interpreter","tex")
@@ -419,8 +400,7 @@ if algoParams.plot_debug
     ylabel(hc,'[a.u.]','Units', 'normalized', 'Position', [2.5, 0.5],'Rotation',90);
 
     nexttile(FW_tiles, 2)
-    fig_imag = sqrt(Fat_GC_odd(:,:,slice_image).*conj(Fat_GC_odd(:,:,slice_image))).*mask(:,:,slice_image);
-    imagesc(fig_imag)
+    imagesc(sqrt(Fat_GC_odd(:,:,slice_image).*conj(Fat_GC_odd(:,:,slice_image))).*mask(:,:,slice_image))
     axis image
     axis off
     title("Fat Image (TE_{odd})","Interpreter","tex")
@@ -456,7 +436,7 @@ if algoParams.plot_debug
     ylabel(hc,'[s^{-1}]','Units', 'normalized', 'Position', [2.5, 0.5],'Rotation',90);
 
     nexttile(FW_tiles, 5)
-    imagesc(phi_map_init(:,:,slice_image).*mask(:,:,slice_image))
+    imagesc(phi_map(:,:,slice_image).*mask(:,:,slice_image))
     axis image
     axis off
     title("Phase Modulation (TE_2)","Interpreter","tex")
@@ -466,7 +446,7 @@ if algoParams.plot_debug
 
     nexttile(FW_tiles, 6)
     % fig_imag = exp(-1.*eps_map(:,:,slice_image));
-    imagesc(eps_map_init(:,:,slice_image).*mask(:,:,slice_image))
+    imagesc(eps_map(:,:,slice_image).*mask(:,:,slice_image))
     axis image
     axis off
     title("Amplitude Modulation (TE_2)","Interpreter","tex")
@@ -533,7 +513,7 @@ if algoParams.plot_debug
     ylabel(hc,'[s^{-1}]','Units', 'normalized', 'Position', [2.5, 0.5],'Rotation',90);
 
     nexttile(FW_tiles2, 5)
-    imagesc(phi_map_init(:,:,slice_image).*mask(:,:,slice_image))
+    imagesc(phi_map(:,:,slice_image).*mask(:,:,slice_image))
     axis image
     axis off
     title("Phase Modulation (TE_2)","Interpreter","tex")
@@ -542,7 +522,7 @@ if algoParams.plot_debug
     ylabel(hc,'[rad]','Units', 'normalized', 'Position', [2.5, 0.5],'Rotation',90);
 
     nexttile(FW_tiles2, 6)
-    imagesc(eps_map_init(:,:,slice_image).*mask(:,:,slice_image))
+    imagesc(eps_map(:,:,slice_image).*mask(:,:,slice_image))
     axis image
     axis off
     title("Amplitude Modulation (TE_2)","Interpreter","tex")
@@ -574,16 +554,9 @@ if unwrapping
     % Calculation of phi map
     phi_map(:,:,vec_slices) = -unwrapped_map(:,:,vec_slices)/2;
 
-else
-    phi_map = -squeeze(angle(complex_map1_combined(:,:,:)))/2;
+else % Keep phi map as least square result
     phi_map(isnan(phi_map))=0;
 end
-
-outParams.bipolar_error_map_theta = phi_map - 1i*eps_map;
-
-%% Total exponential term for correction
-
-total_correction = exp(1i*(phi_map - 1i*eps_map));%exp(2*correction_map).^(1/2);
 
 %% Plot to check results
 
@@ -645,13 +618,13 @@ corrected_bipolar_signal = reshape(corrected_signal,matrix_size(1),matrix_size(2
 
 %% Fat water separation of the corrected signal
 
-algoParams.DO_OT = 0;
+algoParams.DO_OT = 1;
 
 imDataParams.TE = TEs_bipolar;
 
 if VERBOSE
     tic
-    fprintf('Fat-water separation in synthetic unipolar dataset slice ');
+    fprintf('\nFat-water separation in synthetic unipolar dataset slice ');
 end
 for kk = vec_slices
 
