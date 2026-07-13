@@ -7,8 +7,6 @@ function algoParams = grabPars(flags)
     % Ensure input is valid
     if ~any(strcmp(flags.method, {'IGC', 'MixedIGC', 'BipolarIGC', 'vlGC', 'IDEAL-CE', 'SPURS', 'Hierarchical IDEAL', 'Golden Section'}))
         error('The entered technique for chemical shift correction has not been added to this pipeline.')
-    else
-        fprintf('\nPerforming chemical shift correction using %s...\n', flags.method)
     end
     algoParams = struct('useCUDA', true);
     
@@ -54,7 +52,7 @@ function algoParams = grabPars(flags)
             algoParams.LMAP_EXTRA            = 0.05;            % More smoothing for low-signal regions
             algoParams.TRY_PERIODIC_RESIDUAL = 0;               % Take advantage of periodic residual if uniform TEs (will change range_fm)  
             algoParams.tik_reg               = 0;               % Tikhonov regularization binary flag
-            algoParams.plot_debug            = false;
+            algoParams.plot_debug            = true;
 
         case 'vlGC'
             % Algorithm-specific parameters

@@ -1,5 +1,5 @@
 % Trim FOV
-function data = roiIsol(data)
+function D = roiIsol(D)
 % Inputs:
 %     data: data structure
 % 
@@ -7,10 +7,10 @@ function data = roiIsol(data)
 %      data: data structure
 
     % Reset plotrange
-    newsize = [data.Size(1), 1; data.Size(2), 1; 1, data.Size(3)];
+    newsize = [D.Size(1), 1; D.Size(2), 1; 1, D.Size(3)];
     
     % Sum mask slices
-    m_temp = sum(data.Data.Mask, [1, 2]);
+    m_temp = sum(D.Data.Mask, [1, 2]);
 
     % Find mask limits
     [~, newsize(3,1)] = find(m_temp, 1, 'first');
@@ -18,7 +18,7 @@ function data = roiIsol(data)
 
     % Iterate through slices
     for k = newsize(3,1):newsize(3,2)
-        m_temp = data.Data.Mask(:,:,k);
+        m_temp = D.Data.Mask(:,:,k);
             
         % Find mask limits
         [~, j_f] = find(m_temp, 1, 'first');
@@ -75,7 +75,7 @@ function data = roiIsol(data)
 
     % Determine padding amount
     % padsize = (2^nextpow2(newsize(1,2) - newsize(1,1)) - (newsize(1,2) - newsize(1,1)))/2;
-    if data.Flags.Interpolated
+    if D.Flags.Interpolated
         padsize = 20;
     else
         padsize = 10;
@@ -102,12 +102,12 @@ function data = roiIsol(data)
     newsize(2,2) = newsize(2,2) + padsize;
 
     % Trim data
-    data.Data.Image = data.Data.Image(newsize(1,1):newsize(1,2), newsize(2,1):newsize(2,2), newsize(3,1):newsize(3,2), :);
-    data.Data.Mask = data.Data.Mask(newsize(1,1):newsize(1,2), newsize(2,1):newsize(2,2), newsize(3,1):newsize(3,2));
-    data.Data.WeightedMagnitude = data.Data.WeightedMagnitude(newsize(1,1):newsize(1,2), newsize(2,1):newsize(2,2), newsize(3,1):newsize(3,2));
-    data.Size = size(data.Data.Image);
+    D.Data.Image = D.Data.Image(newsize(1,1):newsize(1,2), newsize(2,1):newsize(2,2), newsize(3,1):newsize(3,2), :);
+    D.Data.Mask = D.Data.Mask(newsize(1,1):newsize(1,2), newsize(2,1):newsize(2,2), newsize(3,1):newsize(3,2));
+    D.Data.WeightedMagnitude = D.Data.WeightedMagnitude(newsize(1,1):newsize(1,2), newsize(2,1):newsize(2,2), newsize(3,1):newsize(3,2));
+    D.Size = size(D.Data.Image);
 
     % Update flags
-    data.Flags.Trimmed.InPlane = true;
-    data.TrimmedIndices = newsize;
+    D.Flags.Trimmed.InPlane = true;
+    D.TrimmedIndices = newsize;
 end

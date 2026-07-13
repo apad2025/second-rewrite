@@ -1,11 +1,13 @@
 % Correct chemical shift
-function data = perform(data, flags) 
+function D = perform(D, flags) 
 % Inputs:
 %     data: data structure
 %    flags: processing structure
 % 
 % Outputs:
 %     data: data structure
+
+    fprintf('\nPerforming chemical shift correction using %s...\n', flags.method)
 
     % Algorithm-specific parameters
     algoParams = CSC.grabPars(flags);
@@ -16,26 +18,21 @@ function data = perform(data, flags)
     flags = flags.cscorrection;
 
     % Format data to correct shape
-    images = zeros(data.Size(1), data.Size(2), data.Size(3), 1, data.Size(4));
-    images(:,:,:,1,:) = data.Data.Image;
+    images = zeros(D.Size(1), D.Size(2), D.Size(3), 1, D.Size(4));
+    images(:,:,:,1,:) = D.Data.Image;
 
     % Remove last echo, if necessary
     if any(strcmp(flags.method, {'IGC','MixedIGC','BipolarIGC'})) && rem(size(images,5),2)==1
         images = images(:,:,:,:,1:end-1);
-        data.TE = data.TE(1:end-1);
-        data.deltaTE = mean(diff(data.TE));
-        data.Size(4) = size(images,5);
+        D.TE = D.TE(1:end-1);
+        D.deltaTE = mean(diff(D.TE));
+        D.Size(4) = size(images,5);
     end
 
     % Create data structure
-    dataParams = struct('FieldStrength', data.B0, ...
-                                   'TE', data.TE, ...
+    dataParams = struct('FieldStrength', D.B0, ...
+                                   'TE', D.TE, ...
                 'PrecessionIsClockwise', 1);
-
-    % Preallocate data
-    data.Data.Water = zeros(data.Size(1), data.Size(2), data.Size(3));
-    data.Data.Fat = zeros(data.Size(1), data.Size(2), data.Size(3));
-    data.Data.TotalField = zeros(data.Size(1), data.Size(2), data.Size(3));
 
     % Run correction algorithm
     switch flags.method
@@ -43,37 +40,39 @@ function data = perform(data, flags)
             res = CSC.IGC(images, dataParams, algoParams, verboseFLAG, mnw, false);
 
             % Combine final data
-            data.Data.TotalField = res.FM;
-            data.FieldMap = res.FM;
-            data.Data.Water = res.W;
-            data.Data.Fat = res.F;
+            D.Data.TotalField = res.FM;
+            D.FieldMap = res.FM;
+            D.Data.Water = res.W;
+            D.Data.Fat = res.F;
 
         case 'MixedIGC'
             [magn, comp] = CSC.IGC(images, dataParams, algoParams, verboseFLAG, mnw, true);
 
             % Combine final data
-            data.Data.TotalField = comp.FM;
-            data.FieldMap = magn.FM;
-            data.Data.Water = comp.W;
-            data.Data.Fat = comp.F;
+            D.Data.TotalField = comp.FM;
+            D.FieldMap = magn.FM;
+            D.Data.Water = comp.W;
+            D.Data.Fat = comp.F;
 
         case 'BipolarIGC'
-            dataParams.FieldStrength = data.B0;
-            dataParams.voxelSize = data.VoxelSize;
+            % Grab extra parameters
+            dataParams.FieldStrength = D.B0;
+            dataParams.voxelSize = D.VoxelSize;
             dataParams.images = images;
-            dataParams.mask_fwseparation = data.Data.Mask;
+            dataParams.mask_fwseparation = D.Data.Mask;
 
-            outParams = Function_Bipolar_GC(dataParams, algoParams, 25, verboseFLAG);
-            data.Data = outParams;
+            outParams = Function_Bipolar_GC(dataParams, algoParams, 12, verboseFLAG);
 
-            % data.Data.Water = outParams.DualGC.species(2).amps;
-            % data.Data.Fat = outParams.DualGC.species(1).amps;
-            % data.Data.TotalField = outParams.FieldMap_DualGC;
-            % data.Data.R2StarMap = outParams.R2_DualGC;
-            % data.Data.Odd.Water = outParams.Water_GC_odd;
-            % data.Data.Odd.Fat = outParams.Fat_GC_odd;
-            % data.Data.Even.Water = outParams.Water_GC_even;
-            % data.Data.Even.Fat = outParams.Fat_GC_even;
+            % Combine final data
+            D.Data.Image = squeeze(outParams.corrected_bipolar_signal); % bipolar signal transformed into unipolar equivalent
+            D.Data.Water = outParams.species(2).amps;
+            D.Data.Fat = outParams.species(1).amps;
+            D.Data.TotalField = outParams.fieldmap;
+            D.Data.R2Star = outParams.r2starmap;
+            D.Data.Phi = outParams.phi_map; % related to phase modulation due to bipolar readout
+            D.Data.Epsilon = outParams.eps_map; % related to amplitude modulation due to bipolar readout
+            D.Data.BipolarError = outParams.bipolar_error_map_theta; % phi - i*eps;
+            D.Data.Correction = outParams.total_correction; % correction to remove bipolar induced effects, e^(i*BipolarError)
 
         case 'vlGC'
             % Check parameters
@@ -88,30 +87,33 @@ function data = perform(data, flags)
 
             if verboseFLAG; fprintf('\nCorrecting slices...'); end
             outWaterFatParams = GANDALF(dataParams, algoParams, VARPROparams, verboseFLAG);
-            data.Data.Water = outWaterFatParams.water;
-            data.Data.Fat = outWaterFatParams.fat;
-            data.Data.TotalField = outWaterFatParams.fieldmap;
-            data.Data.R2StarMap = outWaterFatParams.r2starmap;
+            D.Data.Water = outWaterFatParams.water;
+            D.Data.Fat = outWaterFatParams.fat;
+            D.Data.TotalField = outWaterFatParams.fieldmap;
+            D.Data.R2Star = outWaterFatParams.r2starmap;
 
         case 'IDEAL-CE'
-            % Additional data preallocation
-            data.Data.UnwrappedPhase = zeros(data.Size(1), data.Size(2), data.Size(3));
-            data.Data.Error = zeros(data.Size(1), data.Size(2), data.Size(3));
+            % Data preallocation
+            D.Data.Water = zeros(D.Size(1), D.Size(2), D.Size(3));
+            D.Data.Fat = D.Data.Water;
+            D.Data.TotalField = D.Data.Water;
+            D.Data.UnwrappedPhase = D.Data.Water;
+            D.Data.Error = D.Data.Water;
 
             % Iterate through slices
-            for sl = 1:data.Size(3)
+            for sl = 1:D.Size(3)
                 if verboseFLAG; fprintf('\nCorrecting slice %i...\n', sl); end
 
                 % Run algorithm
-                [params, soserror] = presco(data.TE, squeeze(images(:,:,sl,:,:)), data.B0, 'mask', data.Data.Mask(:,:,sl), 'species', species, 'kspace_shift', algoParams.ShiftedkSpace, 'muB', algoParams.muB, 'muR',  algoParams.muR, 'smooth_phase', algoParams.SmoothedPhase, 'smooth_field', algoParams.SmoothedField,  'filter', algoParams.Filter,  'noise', algoParams.NoiseSTD, 'maxit', algoParams.MaxIterations, 'display', false);
+                [params, soserror] = presco(D.TE, squeeze(images(:,:,sl,:,:)), D.B0, 'mask', D.Data.Mask(:,:,sl), 'species', species, 'kspace_shift', algoParams.ShiftedkSpace, 'muB', algoParams.muB, 'muR',  algoParams.muR, 'smooth_phase', algoParams.SmoothedPhase, 'smooth_field', algoParams.SmoothedField,  'filter', algoParams.Filter,  'noise', algoParams.NoiseSTD, 'maxit', algoParams.MaxIterations, 'display', false);
                 
                 % Combine into main structure
-                data.Data.TotalField(:,:,sl) = params.B0; 
-                data.Data.Water(:,:,sl) = params.W; 
-                data.Data.Fat(:,:,sl) = params.F;
-                data.Data.UnwrappedPhase(:,:,sl) = params.PH;
-                data.Data.R2StarMap(:,:,sl) = params.R2;
-                data.Data.Error(:,:,sl) = soserror;
+                D.Data.TotalField(:,:,sl) = params.B0; 
+                D.Data.Water(:,:,sl) = params.W; 
+                D.Data.Fat(:,:,sl) = params.F;
+                D.Data.UnwrappedPhase(:,:,sl) = params.PH;
+                D.Data.R2Star(:,:,sl) = params.R2;
+                D.Data.Error(:,:,sl) = soserror;
             end
 
         case 'SPURS'
@@ -129,23 +131,30 @@ function data = perform(data, flags)
             %             if PrecessionIsClockwise = 1, [] = spurs_gc(conj(iField),TE,CF,voxel_size);
             %             if PrecessionIsClockwise = -1, [] = purcs_gc(iField,TE,CF,voxel_size);
 
-            % Additional data preallocation
-            data.Data.UnwrappedPhase = zeros(data.Size(1), data.Size(2), data.Size(3));
-            data.Data.UncorrectedTotalField = zeros(data.Size(1), data.Size(2), data.Size(3));
+            % Data preallocation
+            D.Data.Water = zeros(D.Size(1), D.Size(2), D.Size(3));
+            D.Data.Fat = D.Data.Water;
+            D.Data.TotalField = D.Data.Water;
+            D.Data.UnwrappedPhase = D.Data.Water;
+            D.Data.UncorrectedTotalField = D.Data.Water;
 
             % Iterate through slices
-            for sl = 1:data.Size(3)
+            for sl = 1:D.Size(3)
                 if verboseFLAG; fprintf('\nCorrecting and unwrapping slice %i...\n', sl); end
                 
                 % Run algorithm
-                [data.Data.Water(:,:,sl), data.Data.Fat(:,:,sl), data.Data.TotalField(:,:,sl), data.Data.UncorrectedTotalField(:,:,sl), data.Data.UnwrappedPhase(:,:,sl), ~] = spurs_gc(data.Data.Image(:,:,sl,:), data.TE, data.F0*1e6, data.VoxelSize, data.Flags.CorrectedBipolarPhase, flags.subsample);
+                [D.Data.Water(:,:,sl), D.Data.Fat(:,:,sl), D.Data.TotalField(:,:,sl), D.Data.UncorrectedTotalField(:,:,sl), D.Data.UnwrappedPhase(:,:,sl), ~] = spurs_gc(D.Data.Image(:,:,sl,:), D.TE, D.F0*1e6, D.VoxelSize, D.Flags.CorrectedBipolarPhase, flags.subsample);
             end
 
         case 'Hierarchical IDEAL'
-            % Additional data preallocation
-            data.Residual = zeros(data.Size(1), data.Size(2), data.Size(3));
+            % Data preallocation
+            D.Data.Water = zeros(D.Size(1), D.Size(2), D.Size(3));
+            D.Data.Fat = D.Data.Water;
+            D.Data.TotalField = D.Data.Water;
+            D.Data.R2Star = D.Data.Water;
+            D.Residual = D.Data.Water;
 
-            for sl = 1:data.Size(3)
+            for sl = 1:D.Size(3)
                 if verboseFLAG; fprintf('\nCorrecting slice %i...\n', sl); end
 
                 % Isolate slice data
@@ -155,11 +164,11 @@ function data = perform(data, flags)
                 outParams = fw_i2cm0c_3pluspoint_tsaojiang(dataParams, algoParams);
 
                 % Combine into main structure
-                data.Data.Water(:,:,sl) = outParams.species(1).amps;
-                data.Data.Fat(:,:,sl) = outParams.species(2).amps;
-                data.Residual(:,:,sl) = outParams.fiterror;
-                data.Data.TotalField(:,:,sl) = outParams.phasemap;
-                data.Data.R2StarMap(:,:,sl) = outParams.r2starmap;
+                D.Data.Water(:,:,sl) = outParams.species(1).amps;
+                D.Data.Fat(:,:,sl) = outParams.species(2).amps;
+                D.Residual(:,:,sl) = outParams.fiterror;
+                D.Data.TotalField(:,:,sl) = outParams.phasemap;
+                D.Data.R2Star(:,:,sl) = outParams.r2starmap;
             end
 
             % Unwrap field map
@@ -168,15 +177,20 @@ function data = perform(data, flags)
             else
                 verboselevel = 'no';
             end
-            for sl = 1:data.Size(3)
-                data.Data.TotalField(:,:,sl) = unwrapping_gc(angle(data.Data.TotalField(:,:,sl)), data.Data.WeightedMagnitude(:,:,sl), data.VoxelSize, verboselevel, 1);
+            for sl = 1:D.Size(3)
+                D.Data.TotalField(:,:,sl) = unwrapping_gc(angle(D.Data.TotalField(:,:,sl)), D.Data.WeightedMagnitude(:,:,sl), D.VoxelSize, verboselevel, 1);
             end
 
             % Correct according to tsao jiang code
-            data.Data.TotalField = (data.Data.TotalField/(2*pi) - 1/3)/(42.5774780505984*data.deltaTE);
+            D.Data.TotalField = (D.Data.TotalField/(2*pi) - 1/3)/(42.5774780505984*D.deltaTE);
 
         case 'Golden Section'
-            for sl = 1:data.Size(3)
+            % Data preallocation
+            D.Data.Water = zeros(D.Size(1), D.Size(2), D.Size(3));
+            D.Data.Fat = zeros(D.Size(1), D.Size(2), D.Size(3));
+            D.Data.TotalField = zeros(D.Size(1), D.Size(2), D.Size(3));
+
+            for sl = 1:D.Size(3)
                 if verboseFLAG; fprintf('\nCorrecting slice %i...\n', sl); end
 
                 % Isolate slice data
@@ -186,16 +200,16 @@ function data = perform(data, flags)
                 outParams = fw_3point_wm_goldSect(dataParams, algoParams);
 
                 % Combine into main structure
-                data.Data.Water(:,:,sl) = outParams.species(1).amps;
-                data.Data.Fat(:,:,sl) = outParams.species(2).amps;
-                data.Data.TotalField(:,:,sl) = outParams.fieldmap;
+                D.Data.Water(:,:,sl) = outParams.species(1).amps;
+                D.Data.Fat(:,:,sl) = outParams.species(2).amps;
+                D.Data.TotalField(:,:,sl) = outParams.fieldmap;
             end
     end
 
     % Add parameters to output structure
     switch flags.method
         case {'IGC','MixedIGC'}
-            data.CSCorrection = struct('Method', flags.method, ...
+            D.CSCorrection = struct('Method', flags.method, ...
                               'SubsampleFactor', algoParams.SUBSAMPLE, ...
                                       'Species', struct('Name', {algoParams.species(1).name, algoParams.species(2).name}, ...
                                                    'Frequency', {algoParams.species(1).frequency, algoParams.species(2).frequency}, ...
@@ -210,13 +224,13 @@ function data = perform(data, flags)
                      'LambdaMapSmoothingFactor', algoParams.LMAP_EXTRA);
 
             if strcmp(flags.method, 'IGC-mixed')
-                data.CSCorrection.Threshold = algoParams.THRESHOLD;
-                data.CSCorrection.PhaseCorruptedEchos = algoParams.NUM_MAGN;
-                data.CSCorrection.R2StarRange = algoParams.range_r2star;
+                D.CSCorrection.Threshold = algoParams.THRESHOLD;
+                D.CSCorrection.PhaseCorruptedEchos = algoParams.NUM_MAGN;
+                D.CSCorrection.R2StarRange = algoParams.range_r2star;
             end
 
         case 'vlGC'
-            data.CSCorrection = struct('Method', flags.method, ...
+            D.CSCorrection = struct('Method', flags.method, ...
                               'SubsampleFactor', algoParams.sampling_stepsize, ...
                                       'Species', struct('Name', {algoParams.species(1).name, algoParams.species(2).name}, ...
                                                    'Frequency', {algoParams.species(1).frequency, algoParams.species(2).frequency}, ...
@@ -229,7 +243,7 @@ function data = perform(data, flags)
                                   'GridSpacing', algoParams.gridspacing);
 
         case 'IDEAL-CE'
-            data.CSCorrection = struct('Method', flags.method, ...
+            D.CSCorrection = struct('Method', flags.method, ...
                                       'Species', struct('Name', {species(1).name, species(2).name}, ...
                                                    'Frequency', {species(1).frequency, species(2).frequency}, ...
                                            'RelativeAmplitude', {species(1).relAmps, species(2).relAmps}), ...
@@ -243,10 +257,10 @@ function data = perform(data, flags)
                                 'MaxIterations', algoParams.MaxIterations);
 
         case 'SPURS'
-            data.CSCorrection = struct('Method', flags.method);
+            D.CSCorrection = struct('Method', flags.method);
 
         case 'Hierarchical IDEAL'
-            data.CSCorrection = struct('Method', flags.method, ...
+            D.CSCorrection = struct('Method', flags.method, ...
                                       'Species', struct('Name', {algoParams.species(1).name, algoParams.species(2).name}, ...
                                                    'Frequency', {algoParams.species(1).frequency, algoParams.species(2).frequency}, ...
                                            'RelativeAmplitude', {algoParams.species(1).relAmps, algoParams.species(2).relAmps}), ...
@@ -256,18 +270,18 @@ function data = perform(data, flags)
                         'T2starCorrectedFWMaps', algoParams.CorrectAmpForT2star, ...
                                     'MaxR2star', algoParams.MaxR2star); 
         case 'Golden Section'
-            data.CSCorrection = struct('Method', flags.method, ...
+            D.CSCorrection = struct('Method', flags.method, ...
                                       'Species', struct('Name', {algoParams.species(1).name, algoParams.species(2).name}, ...
                                                    'Frequency', {algoParams.species(1).frequency, algoParams.species(2).frequency}, ...
                                            'RelativeAmplitude', {algoParams.species(1).relAmps, algoParams.species(2).relAmps}));
     end
 
     % Update data size
-    % data.Size = size(data.Data.TotalField);
+    D.Size = size(D.Data.TotalField);
 
     % Update flags
-    data.Flags.CorrectedChemicalShift = true;
-    data.Flags.UnwrappedPhase = true;
-    data.CSCorrection.FatWaterSwapChecked.Automatic = false;
-    data.CSCorrection.FatWaterSwapChecked.Manual = false;
+    D.Flags.CorrectedChemicalShift = true;
+    D.Flags.UnwrappedPhase = true;
+    D.CSCorrection.FatWaterSwapChecked.Automatic = false;
+    D.CSCorrection.FatWaterSwapChecked.Manual = false;
 end

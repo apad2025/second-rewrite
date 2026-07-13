@@ -1,40 +1,40 @@
 % Correct for bipolar readout error
-function data = perform(data, data_raw, flags)
+function D = perform(D, data_raw, flags)
     if flags.verbose; fprintf('\nCorrecting for bipolar phase error...'); tic; end
     switch flags.bipolarcorrection.method
         case 'MEDI'
-            Mask = data.Data.Mask;
+            Mask = D.Data.Mask;
             Mask = imdilate(Mask, strel('disk', 4));
-            data.Data.Image = iField_correction_new(data.Data.Image, data.VoxelSize, Mask, data.InPlanePhaseEncodingDirection);
+            D.Data.Image = iField_correction_new(D.Data.Image, D.VoxelSize, Mask, D.InPlanePhaseEncodingDirection);
 
         case 'SEPIAslow'
-            [data.Data.Image, data.Data.FIT3D] = BipolarEddyCorrect_custom(data);
+            [D.Data.Image, D.Data.FIT3D] = BipolarEddyCorrect_custom(D);
 
         case 'SEPIAfast'
-            [data.Data.Image,~] = FastBipolarCorrect(data.Data.Image, data.Data.Mask);
+            [D.Data.Image,~] = FastBipolarCorrect(D.Data.Image, D.Data.Mask);
 
         case 'hernando' % https://doi.org/10.1002/mrm.26228
             % Generate phase offset
             phi0 = 0; % degrees
             phi1 = 0; % degrees
             rowFLAG = false;
-            if strcmp(data.InPlanePhaseEncodingDirection, 'ROW'), rowFLAG = true; end
+            if strcmp(D.InPlanePhaseEncodingDirection, 'ROW'), rowFLAG = true; end
             if rowFLAG
-                x = repmat(linspace(-1, 1, data.Size(2)).', [1 data.Size(2) data.Size(3)]);
+                x = repmat(linspace(-1, 1, D.Size(2)).', [1 D.Size(2) D.Size(3)]);
             else % COLUMN
-                x = repmat(linspace(-1, 1, data.Size(1)), [data.Size(1) 1 data.Size(3)]);
+                x = repmat(linspace(-1, 1, D.Size(1)), [D.Size(1) 1 D.Size(3)]);
             end
 
             % Apply phase offset
             % for ec = 2:2:D.Size(4), data.Data.Image(:,:,:,ec) = data_raw.Image(:,:,:,ec).*exp(1i*((phi0 + phi1*x*(ec/2))*(pi/180))); end
-            data.Data.Image(:,:,:,2:2:end) = data_raw.Image(:,:,:,2:2:end).*exp(1i*((phi0 + phi1*x)*(pi/180)));
+            D.Data.Image(:,:,:,2:2:end) = data_raw.Image(:,:,:,2:2:end).*exp(1i*((phi0 + phi1*x)*(pi/180)));
 
             % Create data & parameter structures
-            dataParams = struct('FieldStrength', data.B0, 'TE', data.TE, 'PrecessionIsClockwise', 1);
+            dataParams = struct('FieldStrength', D.B0, 'TE', D.TE, 'PrecessionIsClockwise', 1);
             flags_tmp = flags; flags_tmp.cscorrection = struct('method', 'IGC', 'subsample', 2);
             algoParams = CSC.grabPars(flags_tmp);
-            images = zeros(data.Size(1), data.Size(2), data.Size(3), 1, data.Size(4));
-            images(:,:,:,1,:) = data.Data.Image;
+            images = zeros(D.Size(1), D.Size(2), D.Size(3), 1, D.Size(4));
+            images(:,:,:,1,:) = D.Data.Image;
 
             % Perform magnitude & mixed fitting
             if flags.zipped, mnw = 4; else, mnw = 6; end
@@ -42,15 +42,15 @@ function data = perform(data, data_raw, flags)
 
             % Calculate RMSE between magnitude & complex fitting
             R2starq = magn.R2starM < 100;
-            data.Data.compWq = comp.W.*R2starq; data.Data.compFq = comp.F.*R2starq;
-            data.Data.magnWq = magn.W.*R2starq; data.Data.magnFq = magn.F.*R2starq;
-            RMSE = sqrt(sum((abs(data.Data.compWq) - abs(data.Data.magnWq)).^2 + (abs(data.Data.compFq) - abs(data.Data.magnFq)).^2, 'all'));
+            D.Data.compWq = comp.W.*R2starq; D.Data.compFq = comp.F.*R2starq;
+            D.Data.magnWq = magn.W.*R2starq; D.Data.magnFq = magn.F.*R2starq;
+            RMSE = sqrt(sum((abs(D.Data.compWq) - abs(D.Data.magnWq)).^2 + (abs(D.Data.compFq) - abs(D.Data.magnFq)).^2, 'all'));
     end
 
     % Update flags
-    data.Flags.CorrectedBipolarPhase = true;
-    data.BipolarCorrection = struct('Method', flags.bipolarcorrection.method);
-    if strcmp(flags.bipolarcorrection.method, 'hernando'), data.BipolarCorrection.RMSE = RMSE; end
+    D.Flags.CorrectedBipolarPhase = true;
+    D.BipolarCorrection = struct('Method', flags.bipolarcorrection.method);
+    if strcmp(flags.bipolarcorrection.method, 'hernando'), D.BipolarCorrection.RMSE = RMSE; end
 
     if flags.verbose, tm = toc; fprintf('Done (%0.2f sec)', tm); end
 

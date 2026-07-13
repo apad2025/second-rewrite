@@ -1,5 +1,5 @@
 % Remove background field
-function data = perform(data, flags, dims, verboseFLAG) 
+function D = perform(D, flags, dims, verboseFLAG) 
 % Inputs:
 %     data: data structure
 %    flags: processing structure
@@ -33,12 +33,12 @@ function data = perform(data, flags, dims, verboseFLAG)
     end
 
     % Ensure B0 direction is positive
-    [data, flippedFLAG] = Operations.Flip(data);
+    [D, flippedFLAG] = Operations.Flip(D);
 
     % Check slice direction
-    if ~isequal(data.B0Direction,[0 0 1])
+    if ~isequal(D.B0Direction,[0 0 1])
         disp('This is angled slicing');
-        disp(data.B0Direction);
+        disp(D.B0Direction);
     end
 
     fprintf('\nPerforming %iD background field removal using %s...', dims, flags.method)
@@ -61,7 +61,7 @@ function data = perform(data, flags, dims, verboseFLAG)
             params = struct('kerrads', 8:-1:1);                          % Default [5,4,3,2,1] , convolution kernel sizes (#pixels)
 
         case 'V-SHARP - STISuite'
-            params = struct('psize', data.Size, ...                        Default [12,12,12]  , padding size
+            params = struct('psize', D.Size, ...                        Default [12,12,12]  , padding size
                           'smvsize', 12);                                % Default 12          , kernel size (#pixels)
 
         case 'LBV'
@@ -74,7 +74,7 @@ function data = perform(data, flags, dims, verboseFLAG)
     end
 
     % Remove background field
-    data.Data.LocalField = zeros(data.Size, 'like', data.Data.TotalField);
+    D.Data.LocalField = zeros(D.Size, 'like', D.Data.TotalField);
     switch flags.method
         case 'PDF - MEDI'
             %%% Projection onto Dipole Fields (PDF) - MEDI Toolbox
@@ -96,16 +96,16 @@ function data = perform(data, flags, dims, verboseFLAG)
             %   rdf         : relative difference field, or local field
             %   shim        : cropped background dipole distribution
 
-            data.Data.BackgroundField = zeros(data.Size, 'like', data.Data.TotalField);
+            D.Data.BackgroundField = zeros(D.Size, 'like', D.Data.TotalField);
 
             % Check 2D or 3D
             if dims == 2
-                for sl = 1:data.Size(3)
+                for sl = 1:D.Size(3)
                     if verboseFLAG; fprintf('\nSlice %i...', sl); end
-                    [data.Data.LocalField(:,:,sl), data.Data.BackgroundField(:,:,sl)] = PDF(data.Data.TotalField(:,:,sl), data.Data.NoiseSTD(:,:,sl), data.Data.Mask(:,:,sl), [data.Size(1), data.Size(2)], data.VoxelSize, data.B0Direction, params.tol, params.iter, params.space, params.psize);
+                    [D.Data.LocalField(:,:,sl), D.Data.BackgroundField(:,:,sl)] = PDF(D.Data.TotalField(:,:,sl), D.Data.NoiseSTD(:,:,sl), D.Data.Mask(:,:,sl), [D.Size(1), D.Size(2)], D.VoxelSize, D.B0Direction, params.tol, params.iter, params.space, params.psize);
                 end
             else
-                [data.Data.LocalField, data.Data.BackgroundField] = PDF(data.Data.TotalField, data.Data.NoiseSTD, data.Data.Mask, data.Size, data.VoxelSize, data.B0Direction, params.tol, params.iter, params.space, params.psize);
+                [D.Data.LocalField, D.Data.BackgroundField] = PDF(D.Data.TotalField, D.Data.NoiseSTD, D.Data.Mask, D.Size, D.VoxelSize, D.B0Direction, params.tol, params.iter, params.space, params.psize);
             end
 
         case 'PDF - QSMmaster'
@@ -125,15 +125,15 @@ function data = perform(data, flags, dims, verboseFLAG)
             %   bkg_sus     : background susceptibility
             %   bkg_field   : background field
 
-            data.Data.BackgroundField = zeros(data.Size, 'like', data.Data.TotalField);
+            D.Data.BackgroundField = zeros(D.Size, 'like', D.Data.TotalField);
 
             if dims == 2
-                for sl = 1:data.Size(3)
+                for sl = 1:D.Size(3)
                     if verboseFLAG; fprintf('\nSlice %i...', sl); end
-                    [data.Data.LocalField(:,:,sl), ~, data.Data.BackgroundField(:,:,sl)] = projectionontodipolefields(data.Data.TotalField(:,:,sl), data.Data.Mask(:,:,sl), data.VoxelSize, data.Data.WeightedMagnitude(:,:,sl), data.B0Direction, params.iter);
+                    [D.Data.LocalField(:,:,sl), ~, D.Data.BackgroundField(:,:,sl)] = projectionontodipolefields(D.Data.TotalField(:,:,sl), D.Data.Mask(:,:,sl), D.VoxelSize, D.Data.WeightedMagnitude(:,:,sl), D.B0Direction, params.iter);
                 end
             else
-                [data.Data.LocalField, ~, data.Data.BackgroundField] = projectionontodipolefields(data.Data.TotalField, data.Data.Mask, data.VoxelSize, data.Data.WeightedMagnitude, data.B0Direction, params.iter);
+                [D.Data.LocalField, ~, D.Data.BackgroundField] = projectionontodipolefields(D.Data.TotalField, D.Data.Mask, D.VoxelSize, D.Data.WeightedMagnitude, D.B0Direction, params.iter);
             end
 
         case 'SHARP'
@@ -152,12 +152,12 @@ function data = perform(data, flags, dims, verboseFLAG)
             %   m_ero       : eroded mask after convolution
             
             if dims == 2
-                for sl = 1:data.Size(3)
+                for sl = 1:D.Size(3)
                     if verboseFLAG; fprintf('\nSlice %i...', sl); end
-                    [data.Data.LocalField(:,:,sl), data.Data.Mask(:,:,sl)] = sharp(data.Data.TotalField(:,:,sl), data.Data.Mask(:,:,sl), data.VoxelSize, params.kerrad, params.tsvd);
+                    [D.Data.LocalField(:,:,sl), D.Data.Mask(:,:,sl)] = sharp(D.Data.TotalField(:,:,sl), D.Data.Mask(:,:,sl), D.VoxelSize, params.kerrad, params.tsvd);
                 end
             else
-                [data.Data.LocalField, data.Data.Mask] = sharp(data.Data.TotalField, data.Data.Mask, data.VoxelSize, params.kerrad, params.tsvd);
+                [D.Data.LocalField, D.Data.Mask] = sharp(D.Data.TotalField, D.Data.Mask, D.VoxelSize, params.kerrad, params.tsvd);
             end
 
         case 'V-SHARP - SEPIA'
@@ -175,13 +175,13 @@ function data = perform(data, flags, dims, verboseFLAG)
 
             if dims == 2
                 reverseStr = '';
-                for sl = 1:data.Size(3)
-                    if verboseFLAG; reverseStr = UpdatePercent(100*sl/data.Size(3), reverseStr); end
-                    [data.Data.LocalField(:,:,sl), data.Data.Mask(:,:,sl)] = BKGRemovalVSHARP_2D(data.Data.TotalField(:,:,sl), data.Data.Mask(:,:,sl), [data.Size(1), data.Size(2)], 'radius', params.kerrads);
+                for sl = 1:D.Size(3)
+                    if verboseFLAG; reverseStr = UpdatePercent(100*sl/D.Size(3), reverseStr); end
+                    [D.Data.LocalField(:,:,sl), D.Data.Mask(:,:,sl)] = BKGRemovalVSHARP_2D(D.Data.TotalField(:,:,sl), D.Data.Mask(:,:,sl), [D.Size(1), D.Size(2)], 'radius', params.kerrads);
                 end
                 fprintf('\tDone!\n');
             else
-                [data.Data.LocalField, data.Data.Mask] = BKGRemovalVSHARP(data.Data.TotalField, data.Data.Mask, data.Size, 'radius', params.kerrads);
+                [D.Data.LocalField, D.Data.Mask] = BKGRemovalVSHARP(D.Data.TotalField, D.Data.Mask, D.Size, 'radius', params.kerrads);
             end
 
 
@@ -202,15 +202,15 @@ function data = perform(data, flags, dims, verboseFLAG)
             %   NewMask         : eroded mask
 
             % Remove background field field as algorithm does not output it
-            data = rmfield(data, 'BackgroundField');
+            D = rmfield(D, 'BackgroundField');
 
             if dims == 2
-                data.Data.LocalField = V_SHARP_2d(data.Data.TotalField, data.Data.Mask, 'voxelsize', data.VoxelSize, 'padsize', params.psize, 'smvsize', params.smvsize);
+                D.Data.LocalField = V_SHARP_2d(D.Data.TotalField, D.Data.Mask, 'voxelsize', D.VoxelSize, 'padsize', params.psize, 'smvsize', params.smvsize);
 
                 % For some reason, 2D V-SHARP doesn't output trimmed mask. So have to rerun V-SHARP for the sole purpose of obtaining eroded mask
-                data.Data.Mask = data.Data.LocalField~=0;
+                D.Data.Mask = D.Data.LocalField~=0;
             else
-                [data.Data.LocalField, data.Data.Mask] = V_SHARP(data.Data.TotalField, data.Data.Mask, 'voxelsize', data.VoxelSize, 'smvsize', params.smvsize);
+                [D.Data.LocalField, D.Data.Mask] = V_SHARP(D.Data.TotalField, D.Data.Mask, 'voxelsize', D.VoxelSize, 'smvsize', params.smvsize);
             end
 
         case 'LBV'
@@ -236,7 +236,7 @@ function data = perform(data, flags, dims, verboseFLAG)
                 error(['The LBV background removal algorithm will likely crash if run for 2D data. ' ...
                     'Please verify your system can handle it beforehand. If so, remove this error.'])
             else
-                data.Data.LocalField = LBV(data.Data.TotalField, data.Data.Mask, data.Size, data.VoxelSize, params.tol, params.peel, params.depth, params.n1, params.n2, params.n3);
+                D.Data.LocalField = LBV(D.Data.TotalField, D.Data.Mask, D.Size, D.VoxelSize, params.tol, params.peel, params.depth, params.n1, params.n2, params.n3);
             end
     end
 
@@ -266,10 +266,10 @@ function data = perform(data, flags, dims, verboseFLAG)
             if dims == 2
                 BackgroundRemoval = struct('Method', flags.method, ...
                                           'PadSize', params.psize, ...
-                                    'MaxKernelSize', params.smvsize./data.VoxelSize(1));
+                                    'MaxKernelSize', params.smvsize./D.VoxelSize(1));
             end
-            data.BackgroundRemoval3D = struct('Method', flags.method, ...
-                                       'MaxKernelSize', params.smvsize./data.VoxelSize(1));
+            D.BackgroundRemoval3D = struct('Method', flags.method, ...
+                                       'MaxKernelSize', params.smvsize./D.VoxelSize(1));
 
         case 'LBV'
             BackgroundRemoval = struct('Method', flags.method, ...
@@ -287,39 +287,39 @@ function data = perform(data, flags, dims, verboseFLAG)
         if strcmp(flags.method,'LBV')
             error('LBV can only be used in 3D data!')
         else
-            data.BackgroundRemoval2D = BackgroundRemoval;
+            D.BackgroundRemoval2D = BackgroundRemoval;
         end
     elseif ~strcmp(flags.method,'V-SHARP - STISuite') % skip for special case
-        data.BackgroundRemoval3D = BackgroundRemoval;
+        D.BackgroundRemoval3D = BackgroundRemoval;
     end
 
     % Update flags
     if dims == 2
-        data.Flags.Removed2DBackgroundField = true;
+        D.Flags.Removed2DBackgroundField = true;
         if strcmp(flags.method,'V-SHARP - STISuite')
-            data.Flags.Removed3DBackgroundField = true;
+            D.Flags.Removed3DBackgroundField = true;
         end
     else
-        data.Flags.Removed3DBackgroundField = true;
+        D.Flags.Removed3DBackgroundField = true;
     end
 
     % Correct for flipped data
-    data = Operations.unFlip(data, flippedFLAG);
+    D = Operations.unFlip(D, flippedFLAG);
 
     % Trim empty slices due to erosion
-    sl1 = 1; sl2 = data.Size(3);
-    for sl = 1:data.Size(3)
-        if sum(data.Data.Mask(:,:,sl), "all") == 0
-            if sl < data.Size(3)/2
+    sl1 = 1; sl2 = D.Size(3);
+    for sl = 1:D.Size(3)
+        if sum(D.Data.Mask(:,:,sl), "all") == 0
+            if sl < D.Size(3)/2
                 sl1 = sl+1;
             else
                 sl2 = sl-1;
             end
         end
     end
-    datafields = fieldnames(data.Data);
+    datafields = fieldnames(D.Data);
     for j = 1:numel(datafields)
-        data.Data.(datafields{j}) = data.Data.(datafields{j})(:,:,sl1:sl2);
+        D.Data.(datafields{j}) = D.Data.(datafields{j})(:,:,sl1:sl2);
     end
-    data.Size = size(data.Data.LocalField);
+    D.Size = size(D.Data.LocalField);
 end

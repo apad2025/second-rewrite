@@ -1,5 +1,5 @@
 % Dipole inversion
-function [data] = perform(data, flags, algoParams)
+function [D] = perform(D, flags, algoParams)
 % Inputs:
 %         data: data structure
 %        flags: processing structure
@@ -35,7 +35,7 @@ function [data] = perform(data, flags, algoParams)
     end
 
     % Ensure B0 direction is positive
-    [data, flippedFLAG] = Operations.Flip(data);
+    [D, flippedFLAG] = Operations.Flip(D);
 
     % Algorithm specific parameters
     switch flags.method
@@ -45,7 +45,7 @@ function [data] = perform(data, flags, algoParams)
             try thresh = algoParams.thresh;                 catch; thresh          = 5/20;                       end % Default 3/20  , kernel threshold 
         case 'TVDI'
             try lambda = algoParams.lambda;                 catch; lambda          = 5e-4;                       end % Default 5e-4  , total variation regularization paramter, e.g. 5e-4
-            try weight = algoParams.weight;                 catch; weight          = data.Data.WeightedMagnitude;end % Default mag   , data consistency weighting (mask or magnitude)
+            try weight = algoParams.weight;                 catch; weight          = D.Data.WeightedMagnitude;end % Default mag   , data consistency weighting (mask or magnitude)
             try iter = algoParams.iter;                     catch; iter            = 50;                         end % Default 500   , number of NLCG iterations
             try pnorm = algoParams.pnorm;                   catch; pnorm           = 1;                          end % Default 1     , L1 or L2 regularization
         case 'MEDI'
@@ -58,7 +58,7 @@ function [data] = perform(data, flags, algoParams)
             try tol_norm_ratio = algoParams.tol_norm_ratio; catch; tol_norm_ratio  = 0.1;                        end % Default 0.1   , threshold value of relative update changes
             try gpuFLAG = algoParams.gpuFLAG;               catch; gpuFLAG         = true;                       end
         case {'iLSQR', 'StarQSM'}
-            try psize = algoParams.psize;                   catch; psize           = round(data.Size/10);        end % Default 1/10  , pad size
+            try psize = algoParams.psize;                   catch; psize           = round(D.Size/10);        end % Default 1/10  , pad size
         case 'FANSI'
             try padFLAG = algoParams.padFLAG;               catch; padFLAG         = true;                       end % Default true  , padding flag
             try tgvFLAG = algoParams.tgvFLAG;               catch; tgvFLAG         = false;                      end % Default false , TV or TGV regularization
@@ -78,7 +78,7 @@ function [data] = perform(data, flags, algoParams)
             try padFLAG = algoParams.padFLAG;               catch; padFLAG         = true;                       end % Default true  , padding flag
             try alpha = algoParams.alpha;                   catch; alpha           = 1e-6;                       end % Default 1e-6  , regularization parameter
             try maxOuterInter = algoParams.maxOuterInter;   catch; maxOuterInter   = 1000;                       end % Default 1000  , maximum number of iterations
-            try weight = algoParams.weight;                 catch; weight          = data.Data.WeightedMagnitude;end % Default mag   , data consistency/fidelity weighting
+            try weight = algoParams.weight;                 catch; weight          = D.Data.WeightedMagnitude;end % Default mag   , data consistency/fidelity weighting
             try tau = algoParams.tau;                       catch; tau             = 1;                          end % Default 1     , gradient descent rate
             try precond = algoParams.precond;               catch; precond         = false;                      end % Default false , preconditioned solution for stability (start QSM with 3*weight*lfs instead of array of zeros)
             try isShowIters = algoParams.isShowIters;       catch; isShowIters     = false;                      end % Default false , verbosity flag
@@ -106,15 +106,15 @@ function [data] = perform(data, flags, algoParams)
             %   susc        : output susceptibility map in ppm
     
             % Convert to ppm
-            Parameters.FieldMap = data.Data.LocalField./(42.5774780505984*data.B0); % in ppm
+            Parameters.FieldMap = D.Data.LocalField./(42.5774780505984*D.B0); % in ppm
     
             % Add other inputs to structure
-            Parameters.Mask = data.Data.Mask; % default = 1
+            Parameters.Mask = D.Data.Mask; % default = 1
             Parameters.Threshold = thresh; % delfault = 2/3
-            Parameters.Resolution = data.VoxelSize; % default = [1,1,1]
-            Parameters.B0direction = data.B0Direction; % default = [0,0,1]
+            Parameters.Resolution = D.VoxelSize; % default = [1,1,1]
+            Parameters.B0direction = D.B0Direction; % default = [0,0,1]
     
-            data.Data.SusceptibilityMap = TKD(Parameters);
+            D.Data.SusceptibilityMap = TKD(Parameters);
 
         case 'TKD - SEPIA'
             %%% Truncated k-space Division (TKD) - SEPIA
@@ -141,10 +141,10 @@ function [data] = perform(data, flags, algoParams)
                 end
             end
 
-            data.Data.SusceptibilityMap = qsmTKD(data.Data.LocalField, data.Data.Mask, data.Size, data.VoxelSize, 'threshold', thresh, 'b0dir', data.B0Direction);
+            D.Data.SusceptibilityMap = qsmTKD(D.Data.LocalField, D.Data.Mask, D.Size, D.VoxelSize, 'threshold', thresh, 'b0dir', D.B0Direction);
 
             % Convert to ppm
-            data.Data.SusceptibilityMap = data.Data.SusceptibilityMap./(42.5774780505984*data.B0);
+            D.Data.SusceptibilityMap = D.Data.SusceptibilityMap./(42.5774780505984*D.B0);
 
         case 'TVDI'
             %%% Total Variation Dipole Inversion (TVDI) - QSM-master
@@ -163,17 +163,17 @@ function [data] = perform(data, flags, algoParams)
             % Outputs
             %   sus         : susceptibility distribution after dipole inversion
             %   res         : residual field after QSM fitting
-            %   D           : dipole kernel
+            %   kernel      : dipole kernel
     
             % Convert to ppm
-            lfs = data.Data.LocalField./(42.5774780505984*data.B0);
+            lfs = D.Data.LocalField./(42.5774780505984*D.B0);
 
-            [data.Data.SusceptibilityMap, ~, kernel] = tvdi(lfs, data.Data.Mask, data.VoxelSize, lambda, weight, data.B0Direction, iter, pnorm);
+            [D.Data.SusceptibilityMap, ~, kernel] = tvdi(lfs, D.Data.Mask, D.VoxelSize, lambda, weight, D.B0Direction, iter, pnorm);
 
             % Calculate cost
-            sus = padarray(data.Data.SusceptibilityMap,[0 0 20]);
+            sus = padarray(D.Data.SusceptibilityMap,[0 0 20]);
             lfs = padarray(lfs,[0 0 20]);
-            mask = padarray(data.Data.Mask,[0 0 20]);
+            mask = padarray(D.Data.Mask,[0 0 20]);
             [data_cost, reg_cost] = compute_costs(sus.*mask, lfs.*mask, kernel);
 
         case 'MEDI'
@@ -209,23 +209,23 @@ function [data] = perform(data, flags, algoParams)
     
             % Pad data
             pval = 10;
-            tfs = padarray(data.Data.TotalField, [0 0 pval]);
-            nstd = padarray(data.Data.NoiseSTD, [0 0 pval]);
-            mag = padarray(data.Data.WeightedMagnitude, [0 0 pval]);
-            lfs = padarray(data.Data.LocalField, [0 0 pval]);
-            msk = padarray(data.Data.Mask, [0 0 pval]);
+            tfs = padarray(D.Data.TotalField, [0 0 pval]);
+            nstd = padarray(D.Data.NoiseSTD, [0 0 pval]);
+            mag = padarray(D.Data.WeightedMagnitude, [0 0 pval]);
+            lfs = padarray(D.Data.LocalField, [0 0 pval]);
+            msk = padarray(D.Data.Mask, [0 0 pval]);
 
             % Rename variables for algorithm (and transfer to GPU if requested)
-            data_struct = struct('iFreq', tfs.*(2*pi*data.deltaTE), ...
-                                   'RDF', lfs.*(2*pi*data.deltaTE), ...
+            data_struct = struct('iFreq', tfs.*(2*pi*D.deltaTE), ...
+                                   'RDF', lfs.*(2*pi*D.deltaTE), ...
                                  'N_std', nstd, ...
                                   'iMag', mag, ...
                                   'Mask', msk, ...
                            'matrix_size', size(lfs), ...
-                            'voxel_size', data.VoxelSize, ...
-                              'delta_TE', data.deltaTE, ...
-                                    'CF', data.F0*1e6, ...
-                                'B0_dir', data.B0Direction);
+                            'voxel_size', D.VoxelSize, ...
+                              'delta_TE', D.deltaTE, ...
+                                    'CF', D.F0*1e6, ...
+                                'B0_dir', D.B0Direction);
             if gpuFLAG
                 nfields = fieldnames(data_struct);
                 for i = 1:numel(nfields)
@@ -243,13 +243,13 @@ function [data] = perform(data, flags, algoParams)
             end
     
             if exist('smv', 'var')
-                [data.Data.SusceptibilityMap, reg_cost, data_cost] = MEDI_L1('data_struct', data_struct, 'lambda', lambda, 'data_weighting', data_weighting, 'merit', 'smv', smv, 'percentage', perc, 'max_iter', max_iter, 'cg_max_iter', cg_max_iter, 'tol_norm_ratio', tol_norm_ratio, 'verbose', verbose);
+                [D.Data.SusceptibilityMap, reg_cost, data_cost] = MEDI_L1('data_struct', data_struct, 'lambda', lambda, 'data_weighting', data_weighting, 'merit', 'smv', smv, 'percentage', perc, 'max_iter', max_iter, 'cg_max_iter', cg_max_iter, 'tol_norm_ratio', tol_norm_ratio, 'verbose', verbose);
             else
-                [data.Data.SusceptibilityMap, reg_cost, data_cost] = MEDI_L1('data_struct', data_struct, 'lambda', lambda, 'data_weighting', data_weighting, 'merit',             'percentage', perc, 'max_iter', max_iter, 'cg_max_iter', cg_max_iter, 'tol_norm_ratio', tol_norm_ratio, 'verbose', verbose);
+                [D.Data.SusceptibilityMap, reg_cost, data_cost] = MEDI_L1('data_struct', data_struct, 'lambda', lambda, 'data_weighting', data_weighting, 'merit',             'percentage', perc, 'max_iter', max_iter, 'cg_max_iter', cg_max_iter, 'tol_norm_ratio', tol_norm_ratio, 'verbose', verbose);
             end
 
             % Remove padding
-            data.Data.SusceptibilityMap = data.Data.SusceptibilityMap(:,:,pval+1:end-pval);
+            D.Data.SusceptibilityMap = D.Data.SusceptibilityMap(:,:,pval+1:end-pval);
 
             if gpuFLAG
                 reg_cost = gather(reg_cost);
@@ -282,10 +282,10 @@ function [data] = perform(data, flags, algoParams)
             % Outputs
             %       sus      : QSM images
     
-            sus = QSM_iLSQR(data.Data.LocalField, data.Data.Mask, 'TE', data.TE, 'B0', data.B0, 'H', data.B0Direction, 'padsize', psize, 'voxelsize', data.VoxelSize);
+            sus = QSM_iLSQR(D.Data.LocalField, D.Data.Mask, 'TE', D.TE, 'B0', D.B0, 'H', D.B0Direction, 'padsize', psize, 'voxelsize', D.VoxelSize);
     
             % Convert from ppb to ppm
-            data.Data.SusceptibilityMap = sus./1000;
+            D.Data.SusceptibilityMap = sus./1000;
     
         case 'StarQSM'
             %%% Streaking Artifact Reduction for QSM (StarQSM) - STI Suite
@@ -303,10 +303,10 @@ function [data] = perform(data, flags, algoParams)
             % Outputs
             %       sus      : QSM images
     
-            sus = QSM_star(data.Data.LocalField, data.Data.Mask, 'TE', data.TE, 'B0', data.B0, 'H', data.B0Direction, 'padsize', psize, 'voxelsize', data.VoxelSize);
+            sus = QSM_star(D.Data.LocalField, D.Data.Mask, 'TE', D.TE, 'B0', D.B0, 'H', D.B0Direction, 'padsize', psize, 'voxelsize', D.VoxelSize);
 
             % Convert from ppb to ppm
-            data.Data.SusceptibilityMap = sus./1000;
+            D.Data.SusceptibilityMap = sus./1000;
 
         case 'FANSI'
             %%% FAst Nonlinear Susceptibility Inversion (FANSI) - FANSI Toolbox
@@ -354,26 +354,26 @@ function [data] = perform(data, flags, algoParams)
                 p = 4;
 
                 % Pad data
-                msk_pad = padarray(data.Data.Mask, floor(data.Size/p));
-                lfs_pad = padarray(data.Data.LocalField, floor(data.Size/p));
-                mag_pad = padarray(data.Data.WeightedMagnitude, floor(data.Size/p));
+                msk_pad = padarray(D.Data.Mask, floor(D.Size/p));
+                lfs_pad = padarray(D.Data.LocalField, floor(D.Size/p));
+                mag_pad = padarray(D.Data.WeightedMagnitude, floor(D.Size/p));
             else
-                msk_pad = data.Data.Mask;
-                lfs_pad = data.Data.LocalField;
-                mag_pad = data.Data.WeightedMagnitude;
+                msk_pad = D.Data.Mask;
+                lfs_pad = D.Data.LocalField;
+                mag_pad = D.Data.WeightedMagnitude;
             end
-            n = data.Size;
+            n = D.Size;
             N = size(msk_pad);
 
             % Create kernel (from FANSI to account for angled slices)
-            kernel = dipole_kernel_angulated(N, data.VoxelSize, data.B0Direction);
+            kernel = dipole_kernel_angulated(N, D.VoxelSize, D.B0Direction);
 
             % Run main algorithm
             mu1 = 100*alpha;
             options = struct('isTGV', tgvFLAG, ...
                        'isNonlinear', nonlinearFLAG, ...
-                         'voxelSize', data.VoxelSize, ...
-                            'B0_dir', data.B0Direction, ...
+                         'voxelSize', D.VoxelSize, ...
+                            'B0_dir', D.B0Direction, ...
                                 'mu', mu1, ...
                         'iterations', maxOuterInter, ...
                             'update', tol_update);
@@ -381,29 +381,29 @@ function [data] = perform(data, flags, algoParams)
                 options.gradientMode = gradientMode;
             end
             out = FANSI(lfs_pad, mag_pad, alpha, options);
-            data.Data.SusceptibilityMap = out.x;
+            D.Data.SusceptibilityMap = out.x;
 
             % Calculate cost
             [data_cost, reg_cost] = compute_costs(out.x.*msk_pad, lfs_pad.*msk_pad, kernel);
 
             % Crop output
             if padFLAG
-                data.Data.SusceptibilityMap = out.x(1+floor(n(1)/p):floor((1+1/p)*n(1)), 1+floor(n(2)/p):floor((1+1/p)*n(2)), 1+floor(n(3)/p):floor((1+1/p)*n(3))).*data.Data.Mask;
+                D.Data.SusceptibilityMap = out.x(1+floor(n(1)/p):floor((1+1/p)*n(1)), 1+floor(n(2)/p):floor((1+1/p)*n(2)), 1+floor(n(3)/p):floor((1+1/p)*n(3))).*D.Data.Mask;
             else
-                data.Data.SusceptibilityMap = out.x;
+                D.Data.SusceptibilityMap = out.x;
             end
 
         case 'Closed Form L2'
             if padFLAG
                 % Pad data
-                msk_pad = padarray(data.Data.Mask, data.Size/2);
-                nfm_pad = padarray(data.Data.LocalField, data.Size/2);
+                msk_pad = padarray(D.Data.Mask, D.Size/2);
+                nfm_pad = padarray(D.Data.LocalField, D.Size/2);
             end
-            n = data.Size;
+            n = D.Size;
             N = size(msk_pad);
 
             % Create kernel (from FANSI to account for angled slices)
-            kernel = dipole_kernel_angulated(N, data.VoxelSize, data.B0Direction);
+            kernel = dipole_kernel_angulated(N, D.VoxelSize, D.B0Direction);
 
             % Closed form QSM solution
             [k2,k1,k3] = meshgrid(0:N(2)-1, 0:N(1)-1, 0:N(3)-1);
@@ -418,17 +418,17 @@ function [data] = perform(data, flags, algoParams)
             [data_cost, reg_cost] = compute_costs(D_regx.*msk_pad, nfm_pad.*msk_pad, kernel);
 
             % Crop data
-            data.Data.SusceptibilityMap = D_regx(1+n(1)/2:1.5*n(1), 1+n(2)/2:1.5*n(2), 1+n(3)/2:1.5*n(3)).*data.Data.Mask;
+            D.Data.SusceptibilityMap = D_regx(1+n(1)/2:1.5*n(1), 1+n(2)/2:1.5*n(2), 1+n(3)/2:1.5*n(3)).*D.Data.Mask;
 
         case 'Closed Form'
             % Convert to ppm
-            lfs = data.Data.LocalField./(42.5774780505984*data.B0);
+            lfs = D.Data.LocalField./(42.5774780505984*D.B0);
 
-            [data.Data.SusceptibilityMap, lambda] = reconstructSusceptibility(lfs, data.Data.Mask, data.VoxelSize, lambda, data.B0Direction);
+            [D.Data.SusceptibilityMap, lambda] = reconstructSusceptibility(lfs, D.Data.Mask, D.VoxelSize, lambda, D.B0Direction);
 
         case 'NDI'
             % Convert to rad from Hz (rad = Hz*2pi*sec)
-            lfs = data.Data.LocalField.*(2*pi*data.deltaTE);
+            lfs = D.Data.LocalField.*(2*pi*D.deltaTE);
 
             % Pad data
             if padFLAG
@@ -437,18 +437,18 @@ function [data] = perform(data, flags, algoParams)
                 zpad = 60;
                 lfs = padarray(lfs, [xpad, ypad, zpad], 0, 'both');
                 weight = padarray(weight, [xpad, ypad, zpad], 0, 'both');
-                msk = padarray(data.Data.Mask, [xpad, ypad, zpad], 0, 'both');
+                msk = padarray(D.Data.Mask, [xpad, ypad, zpad], 0, 'both');
             end
 
             % Create kernel
-            kernel = dipole_kernel_angulated(size(lfs), data.VoxelSize, data.B0Direction);
+            kernel = dipole_kernel_angulated(size(lfs), D.VoxelSize, D.B0Direction);
 
             % Run main algorithm
             options = struct('input', lfs, ...
                                  'K', kernel, ...
                              'alpha', alpha, ...
                      'maxOuterInter', maxOuterInter, ...
-                         'voxelSize', data.VoxelSize, ...
+                         'voxelSize', D.VoxelSize, ...
                             'weight', weight, ...
                                'tau', tau, ...
                            'precond', precond, ...
@@ -463,12 +463,12 @@ function [data] = perform(data, flags, algoParams)
             [data_cost, reg_cost] = compute_costs(out.x.*msk, lfs.*msk, kernel);
 
             % Transfer to output structure
-            data.Data.SusceptibilityMap = out.x(xpad+1:end-xpad,ypad+1:end-ypad,zpad+1:end-zpad);
+            D.Data.SusceptibilityMap = out.x(xpad+1:end-xpad,ypad+1:end-ypad,zpad+1:end-zpad);
             weight = weight(xpad+1:end-xpad,ypad+1:end-ypad,zpad+1:end-zpad);
 
         case 'Magnitude Weighted L1'
             % Convert to rad from Hz (rad = Hz*2pi*sec)
-            lfs = data.Data.LocalField.*(2*pi*data.deltaTE);
+            lfs = D.Data.LocalField.*(2*pi*D.deltaTE);
 
             % Pad data
             if padFLAG
@@ -476,37 +476,37 @@ function [data] = perform(data, flags, algoParams)
                 ypad = 32;
                 zpad = 8;
                 lfs = padarray(lfs, [xpad, ypad, zpad], 0, 'both');
-                msk = padarray(data.Data.Mask, [xpad, ypad, zpad], 0, 'both');
-                mag = padarray(data.Data.WeightedMagnitude, [xpad, ypad, zpad], 0, 'both');
+                msk = padarray(D.Data.Mask, [xpad, ypad, zpad], 0, 'both');
+                mag = padarray(D.Data.WeightedMagnitude, [xpad, ypad, zpad], 0, 'both');
             end
 
             % Run algorithm
-            data.Data.SusceptibilityMap = L1_magnWeighted_reconstruction(lfs, mag, msk, data.VoxelSize, lambda_L1, lambda_L2, data.B0Direction);
+            D.Data.SusceptibilityMap = L1_magnWeighted_reconstruction(lfs, mag, msk, D.VoxelSize, lambda_L1, lambda_L2, D.B0Direction);
 
             % Transfer to output structure
-            data.Data.SusceptibilityMap = data.Data.SusceptibilityMap(xpad+1:end-xpad,ypad+1:end-ypad,zpad+1:end-zpad);
+            D.Data.SusceptibilityMap = D.Data.SusceptibilityMap(xpad+1:end-xpad,ypad+1:end-ypad,zpad+1:end-zpad);
     end
 
     % Save parameters to output structure
     switch flags.method
         case {'TKD - MRIscm', 'TKD - SEPIA'}
-            data.DipoleInversion = struct('Method', flags.method, ...
+            D.DipoleInversion = struct('Method', flags.method, ...
                                        'Threshold', thresh);
         case 'TVDI'
-            data.DipoleInversion = struct('Method', flags.method, ...
+            D.DipoleInversion = struct('Method', flags.method, ...
                          'RegularizationParameter', lambda, ...
                                    'MaxIterations', iter, ...
                              'LRegularizationType', pnorm, ...
                              'DataConsistencyCost', data_cost, ...
                               'RegularizationCost', reg_cost);
-            if all(weight==data.Data.Mask,"all")
-                data.DipoleInversion.DataConsistencyWeighting = 'Mask';
+            if all(weight==D.Data.Mask,"all")
+                D.DipoleInversion.DataConsistencyWeighting = 'Mask';
             else
-                data.DipoleInversion.DataConsistencyWeighting = 'Magnitude';
+                D.DipoleInversion.DataConsistencyWeighting = 'Magnitude';
             end
         case 'MEDI'
             if gpuFLAG
-                data.Data.SusceptibilityMap = gather(data.Data.SusceptibilityMap);
+                D.Data.SusceptibilityMap = gather(D.Data.SusceptibilityMap);
                 lambda = gather(lambda);
                 perc = gather(perc);
                 max_iter = gather(max_iter);
@@ -517,7 +517,7 @@ function [data] = perform(data, flags, algoParams)
                 end
             end
 
-            data.DipoleInversion = struct('Method', flags.method, ...
+            D.DipoleInversion = struct('Method', flags.method, ...
                          'RegularizationParameter', lambda, ...
                                      'SNRWeighted', data_weighting, ...
                                            'MERIT', true, ...
@@ -529,16 +529,16 @@ function [data] = perform(data, flags, algoParams)
                              'DataConsistencyCost', data_cost, ...
                               'RegularizationCost', reg_cost);
             if exist('smv', 'var')
-                data.DipoleInversion.SMV = true;
-                data.DipoleInversion.SMVRadius = smv;
+                D.DipoleInversion.SMV = true;
+                D.DipoleInversion.SMVRadius = smv;
             else
-                data.DipoleInversion.SMV = false;
+                D.DipoleInversion.SMV = false;
             end
         case {'iLSQR',  'Star'}
-            data.DipoleInversion = struct('Method', flags.method, ...
+            D.DipoleInversion = struct('Method', flags.method, ...
                                          'PadSize', psize);
         case 'FANSI'
-            data.DipoleInversion = struct('Method', flags.method, ...
+            D.DipoleInversion = struct('Method', flags.method, ...
                                        'PaddedFOV', padFLAG, ...
                                      'Generalized', tgvFLAG, ...
                                        'Nonlinear', nonlinearFLAG, ...
@@ -549,19 +549,19 @@ function [data] = perform(data, flags, algoParams)
                              'DataConsistencyCost', data_cost, ...
                               'RegularizationCost', reg_cost);
             if exist('gradientMode', 'var')
-                data.DipoleInversion.GradientMode = gradientMode;
+                D.DipoleInversion.GradientMode = gradientMode;
             end
             if exist('kernelMode', 'var')
-                data.DipoleInversion.KernelMode = kernelMode;
+                D.DipoleInversion.KernelMode = kernelMode;
             end
         case 'Closed Form L2'
-            data.DipoleInversion = struct('Method', flags.method, ...
+            D.DipoleInversion = struct('Method', flags.method, ...
                                        'PaddedFOV', padFLAG, ...
                          'RegularizationParameter', lambda, ...
                              'DataConsistencyCost', data_cost, ...
                               'RegularizationCost', reg_cost);
         case 'NDI'
-            data.DipoleInversion = struct('Method', flags.method, ...
+            D.DipoleInversion = struct('Method', flags.method, ...
                                        'PaddedFOV', padFLAG, ...
                                    'MaxIterations', maxOuterInter, ...
                          'RegularizationParameter', alpha, ...
@@ -569,16 +569,16 @@ function [data] = perform(data, flags, algoParams)
                              'DataConsistencyCost', data_cost, ...
                               'RegularizationCost', reg_cost);
 
-            if all(weight==data.Data.Mask,"all")
-                data.DipoleInversion.DataConsistencyWeighting = 'Mask';
+            if all(weight==D.Data.Mask,"all")
+                D.DipoleInversion.DataConsistencyWeighting = 'Mask';
             else
-                data.DipoleInversion.DataConsistencyWeighting = 'Magnitude';
+                D.DipoleInversion.DataConsistencyWeighting = 'Magnitude';
             end
     end
 
     % Correct for flipped data
-    data = Operations.unFlip(data, flippedFLAG);
+    D = Operations.unFlip(D, flippedFLAG);
 
     % Update flags
-    data.Flags.InvertedDipole = true;
+    D.Flags.InvertedDipole = true;
 end

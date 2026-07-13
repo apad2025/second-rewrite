@@ -1,5 +1,5 @@
 % L-curve
-function [lambda, Kappa, cost_data, cost_reg] = lcurve(data, method, params, plrange)
+function [lambda, Kappa, cost_data, cost_reg] = lcurve(D, method, params, plrange)
 
     % Set method
     flags.method = method;
@@ -26,11 +26,11 @@ function [lambda, Kappa, cost_data, cost_reg] = lcurve(data, method, params, plr
             end
             nfields = {'deltaTE', 'VoxelSize', 'F0', 'B0Direction'};
             for i = 1:numel(nfields)
-                data.(nfields{i}) = gpuArray(data.(nfields{i}));
+                D.(nfields{i}) = gpuArray(D.(nfields{i}));
             end
             nfields = {'TotalField', 'LocalField', 'NoiseSTD', 'WeightedMagnitude', 'Mask'};
             for i = 1:numel(nfields)
-                data.Data.(nfields{i}) = gpuArray(data.Data.(nfields{i}));
+                D.Data.(nfields{i}) = gpuArray(D.Data.(nfields{i}));
             end
             params.gpuFLAG = false;
             gpuFLAG = true;
@@ -48,11 +48,11 @@ function [lambda, Kappa, cost_data, cost_reg] = lcurve(data, method, params, plr
             % Solve for QSM
             fprintf('\nIter %i/%i, lambda = %.3g', i-1, length(lambda)-2, lambda(i))
     
-            data = dipoleinversion(data, flags, params);
+            D = dipoleinversion(D, flags, params);
     
             % Extract cost values
-            cost_data(i) = data.DipoleInversion.DataConsistencyCost;
-            cost_reg(i) = data.DipoleInversion.RegularizationCost;
+            cost_data(i) = D.DipoleInversion.DataConsistencyCost;
+            cost_reg(i) = D.DipoleInversion.RegularizationCost;
         end
         flags = rmfield(flags, 'verbose');
 
@@ -64,11 +64,11 @@ function [lambda, Kappa, cost_data, cost_reg] = lcurve(data, method, params, plr
             end
             nfields = {'deltaTE', 'VoxelSize', 'F0', 'B0Direction'};
             for i = 1:numel(nfields)
-                data.(nfields{i}) = gather(data.(nfields{i}));
+                D.(nfields{i}) = gather(D.(nfields{i}));
             end
             nfields = {'TotalField', 'LocalField', 'NoiseSTD', 'WeightedMagnitude', 'Mask'};
             for i = 1:numel(nfields)
-                data.Data.(nfields{i}) = gather(data.Data.(nfields{i}));
+                D.Data.(nfields{i}) = gather(D.Data.(nfields{i}));
             end
             params.gpuFLAG = true;
             cost_data = gather(cost_data);
@@ -107,35 +107,35 @@ function [lambda, Kappa, cost_data, cost_reg] = lcurve(data, method, params, plr
         end
     
         % Obtain QSM
-        data_max = dipoleinversion(data, flags, params_max);
-        data_zero = dipoleinversion(data, flags, params_zero);
+        data_max = dipoleinversion(D, flags, params_max);
+        data_zero = dipoleinversion(D, flags, params_zero);
     
     else
         % Ensure B0 direction is positive
-        [data, ~] = Operations.Flip(data);
+        [D, ~] = Operations.Flip(D);
 
         % Convert to rad from Hz (rad = Hz*2pi*sec)
-        lfs = data.Data.LocalField.*(2*pi*data.deltaTE);
+        lfs = D.Data.LocalField.*(2*pi*D.deltaTE);
 
         % Pad data
         xpad = 32;
         ypad = 32;
         zpad = 8;
         lfs = padarray(lfs, [xpad, ypad, zpad], 0, 'both');
-        msk = padarray(data.Data.Mask, [xpad, ypad, zpad], 0, 'both');
-        mag = padarray(data.Data.WeightedMagnitude, [xpad, ypad, zpad], 0, 'both');
+        msk = padarray(D.Data.Mask, [xpad, ypad, zpad], 0, 'both');
+        mag = padarray(D.Data.WeightedMagnitude, [xpad, ypad, zpad], 0, 'both');
 
         % Find optimal L2
         disp('Finding the optimal L2-parameter:');
-        [chiL2, lambda.L2] = reconstructSusceptibility(lfs, msk, data.VoxelSize, params.lambda_L2, data.B0Direction); % ppm
+        [chiL2, lambda.L2] = reconstructSusceptibility(lfs, msk, D.VoxelSize, params.lambda_L2, D.B0Direction); % ppm
 
         % Find optimal L1
         disp('L1-parameter sweep (pairwise calculation of Lcurve-nodes)');
-        lambda.L1 = L1_sweep(lfs, msk, data.VoxelSize, params.lambda_L1, lambda.L2, data.B0Direction);
+        lambda.L1 = L1_sweep(lfs, msk, D.VoxelSize, params.lambda_L1, lambda.L2, D.B0Direction);
 
         % The final magnitude weighted reconstruction
         disp('The final magnitude weighted reconstruction');
-        chiL1 = L1_magnWeighted_reconstruction(lfs, mag, msk, data.VoxelSize, lambda.L1, lambda.L2);
+        chiL1 = L1_magnWeighted_reconstruction(lfs, mag, msk, D.VoxelSize, lambda.L1, lambda.L2);
 
         % Remove padding
         chiL1 = chiL1(xpad+1:end-xpad,ypad+1:end-ypad,zpad+1:end-zpad);
@@ -185,12 +185,12 @@ function [lambda, Kappa, cost_data, cost_reg] = lcurve(data, method, params, plr
         plotmygraph(real(data_zero.Data.SusceptibilityMap), 'PlotTitle', [pltitle_zero, ' (Zero-Curvature)'], 'ColorbarTitle', 'Magnetic Susceptibility (ppm)', 'DataRange', plrange);
     else
         % Extract MIPs for viewing
-        chiL2_tra =        squeeze(        max(chiL2(:, :, round(data.Size(3)/2)+(-2:2)),[],3));
-        chiL1_tra =        squeeze(        max(chiL1(:, :, round(data.Size(3)/2)+(-2:2)),[],3));
-        chiL2_cor = flipud(squeeze(permute(max(chiL2(round(data.Size(1)/2)+(-2:2), :, :),[],1),[2,3,1])));
-        chiL1_cor = flipud(squeeze(permute(max(chiL1(round(data.Size(1)/2)+(-2:2), :, :),[],1),[2,3,1])));
-        chiL2_sag = flipud(squeeze(permute(max(chiL2(:, round(data.Size(2)/2)+(-2:2), :),[],2),[3,1,2])));
-        chiL1_sag = flipud(squeeze(permute(max(chiL1(:, round(data.Size(2)/2)+(-2:2), :),[],2),[3,1,2])));
+        chiL2_tra =        squeeze(        max(chiL2(:, :, round(D.Size(3)/2)+(-2:2)),[],3));
+        chiL1_tra =        squeeze(        max(chiL1(:, :, round(D.Size(3)/2)+(-2:2)),[],3));
+        chiL2_cor = flipud(squeeze(permute(max(chiL2(round(D.Size(1)/2)+(-2:2), :, :),[],1),[2,3,1])));
+        chiL1_cor = flipud(squeeze(permute(max(chiL1(round(D.Size(1)/2)+(-2:2), :, :),[],1),[2,3,1])));
+        chiL2_sag = flipud(squeeze(permute(max(chiL2(:, round(D.Size(2)/2)+(-2:2), :),[],2),[3,1,2])));
+        chiL1_sag = flipud(squeeze(permute(max(chiL1(:, round(D.Size(2)/2)+(-2:2), :),[],2),[3,1,2])));
 
         % Determine colorbar range
         cmin_L2 = min([min(chiL2_tra,[],'all'), min(chiL2_cor,[],'all'), min(chiL2_sag,[],'all')]);
@@ -200,27 +200,27 @@ function [lambda, Kappa, cost_data, cost_reg] = lcurve(data, method, params, plr
 
         figureFULL; tiledlayout(2, 3, 'TileSpacing', 'compact', 'Padding', 'compact');
         nexttile; imagesc(chiL2_tra); set(gca,'XTickLabel',[]); set(gca,'YTickLabel',[]); ylabel('L2 QSM'); 
-        pbaspect([data.Size(1)*data.VoxelSize(1), data.Size(2)*data.VoxelSize(2), 1]);
+        pbaspect([D.Size(1)*D.VoxelSize(1), D.Size(2)*D.VoxelSize(2), 1]);
         colormap gray; clim([cmin_L2, cmax_L2]); 
         
         nexttile; imagesc(chiL2_cor); axis off;
-        pbaspect([data.Size(2)*data.VoxelSize(2), data.Size(3)*data.VoxelSize(3), 1])
+        pbaspect([D.Size(2)*D.VoxelSize(2), D.Size(3)*D.VoxelSize(3), 1])
         colormap gray; clim([cmin_L2, cmax_L2]); 
 
         nexttile; imagesc(chiL2_sag); axis off;
-        pbaspect([data.Size(1)*data.VoxelSize(1), data.Size(3)*data.VoxelSize(3), 1])
+        pbaspect([D.Size(1)*D.VoxelSize(1), D.Size(3)*D.VoxelSize(3), 1])
         colormap gray; clim([cmin_L2, cmax_L2]); cb = colorbar; cb.Label.String = 'Susceptibility (ppm)';
 
         nexttile; imagesc(chiL1_tra); set(gca,'XTickLabel',[]); set(gca,'YTickLabel',[]); ylabel('L1 Mag Weighted QSM');
-        pbaspect([data.Size(1)*data.VoxelSize(1), data.Size(2)*data.VoxelSize(2), 1]);
+        pbaspect([D.Size(1)*D.VoxelSize(1), D.Size(2)*D.VoxelSize(2), 1]);
         colormap gray; clim([cmin_L1, cmax_L1]); 
         
         nexttile; imagesc(chiL1_cor); axis off;
-        pbaspect([data.Size(2)*data.VoxelSize(2), data.Size(3)*data.VoxelSize(3), 1])
+        pbaspect([D.Size(2)*D.VoxelSize(2), D.Size(3)*D.VoxelSize(3), 1])
         colormap gray; clim([cmin_L1, cmax_L1]); 
 
         nexttile; imagesc(chiL1_sag); axis off;
-        pbaspect([data.Size(1)*data.VoxelSize(1), data.Size(3)*data.VoxelSize(3), 1])
+        pbaspect([D.Size(1)*D.VoxelSize(1), D.Size(3)*D.VoxelSize(3), 1])
         colormap gray; clim([cmin_L1, cmax_L1]); cb = colorbar; cb.Label.String = 'Susceptibility (ppm)';
     end
 end
