@@ -548,7 +548,7 @@ if unwrapping
     unwrapped_map = zeros(size(eps_map));
 
     % Unwrapping
-    unwrapped_map(:,:,vec_slices) = qualityGuidedUnwrapping(squeeze(imag(correction_map_unwrapped(:,:,vec_slices))), squeeze(imDataParams.mask_fwseparation(:,:,vec_slices)), squeeze(abs(complex_map1_combined(:,:,vec_slices))));
+    unwrapped_map(:,:,vec_slices) = qualityGuidedUnwrapping(squeeze(imag(correction_map_unwrapped(:,:,vec_slices))), squeeze(mask(:,:,vec_slices)), squeeze(abs(complex_map1_combined(:,:,vec_slices))));
 
     % Calculation of phi map
     phi_map(:,:,vec_slices) = unwrapped_map(:,:,vec_slices);
