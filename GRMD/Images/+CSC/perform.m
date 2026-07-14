@@ -7,7 +7,7 @@ function D = perform(D, flags)
 % Outputs:
 %     data: data structure
 
-    fprintf('\nPerforming chemical shift correction using %s...\n', flags.method)
+    fprintf('\nPerforming chemical shift correction using %s...\n', flags.cscorrection.method)
 
     % Algorithm-specific parameters
     algoParams = CSC.grabPars(flags);
