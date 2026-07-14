@@ -250,9 +250,15 @@ f_odd = zeros(size(imDataParams.images,1), size(imDataParams.images,2), 1, size(
 w_even = w_odd;
 f_even = f_odd;
 
+DO_OT = 0; % forced false until OT is added into Bipolar_GC pipeline
+
 if VERBOSE
     tic
-    fprintf('\nEstimating R2star map...')
+    if DO_OT == 1
+        fprintf('\nEstimating R2star map and performing optimization transfer...')
+    else
+        fprintf('\nEstimating R2star map...')
+    end
 end
 
 % Now take the field map fm and get the rest of the estimates

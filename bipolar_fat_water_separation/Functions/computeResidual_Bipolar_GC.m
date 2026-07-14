@@ -110,13 +110,16 @@ if VERBOSE
 end
 P = zeros(N*NUM_FMS,N,length(r2s));
 for kr = 1:length(r2s)%NUM_R2STARS
-    P1 = [];
+    P1 = zeros(N*NUM_FMS,N);
+    idx = 1;
     for k = 1:NUM_FMS
-        Psi = diag(exp(j*2*pi*psis(k)*t - abs(t)*r2s(kr)));
-        P1 = [P1;(eye(N)-Psi*Phi*pinv(Psi*Phi))];
+        Psi = diag(exp(1i*2*pi*psis(k)*t - abs(t)*r2s(kr)));
+        P1(idx:idx+N-1,:) = eye(N) - Psi*Phi*pinv(Psi*Phi);
+        idx = idx + N;
     end
     P(:,:,kr) = P1;
 end
+
 if VERBOSE
     tttime = toc;
     fprintf('Done (%.2f sec)', tttime)

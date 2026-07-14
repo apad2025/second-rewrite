@@ -1,21 +1,28 @@
-% save the nth slice of every 358x358x50 struct
-% so it becomes 358x358
+% Keep only D.Data, and reduce every volume in it to a single slice,
+% e.g. 358x358x50 -> 358x358 and 358x358x50x6 (Image) -> 358x358x1x6
 clear; clc; close all
 
 slice = 12;
 
-% Drop all fields except Data
-path = "C:\Users\apad2\Desktop\second_rewrite\results\FWbigc_zip.mat";
-Data = load(path, 'D').D.Data;
-save(path, 'Data');
+path = "C:\Users\apad2\Desktop\second_rewrite\results\updated\second_run.mat";
 
-% loop over Data and trim down each array
+% The file may still hold the original D, or an already-extracted Data
+S = load(path);
+if isfield(S, 'D')
+    Data = S.D.Data;
+else
+    Data = S.Data;
+end
+clear S
+
+% Trim each field along the slice (3rd) dimension, keeping any trailing
+% dimensions such as the echoes in Image
 fnames = fieldnames(Data);
-for i = [1, 3:6, 8:14]
-    Data.(fnames{i}) = Data.(fnames{i})(:,:,slice);
+for i = 1:numel(fnames)
+    v = Data.(fnames{i});
+    if ndims(v) >= 3 && size(v, 3) >= slice
+        Data.(fnames{i}) = v(:, :, slice, :);
+    end
 end
-for i = 1:2
-    Data.species(i).amps = Data.species(i).amps(:,:,slice);
-end
-Data.corrected_bipolar_signal = Data.corrected_bipolar_signal(:,:,slice,:,:);
+
 save(path, 'Data');

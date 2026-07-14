@@ -50,12 +50,12 @@ input_signal_bipolar_RO = imDataParams.images;
 
 %% Matrix size and number of voxels
 
-matrix_size = size(input_signal_bipolar_RO,1:3);
-numvox = prod(matrix_size);
+matrix_size = size(input_signal_bipolar_RO);
+numvox = prod(matrix_size(1:3));
 
 %% Number of echoes
 
-numte = size(input_signal_bipolar_RO,5);
+numte = matrix_size(5);
 
 %% Echo times for the full bipolar dataset
 
@@ -68,7 +68,7 @@ mask = imDataParams.mask_fwseparation;
 %% Memory allocation
 
 % Field maps and R2 star maps
-Water_GC_odd = zeros(size(input_signal_bipolar_RO,1:numte/2));
+Water_GC_odd = zeros(matrix_size(1:3));
 Fat_GC_odd = Water_GC_odd;
 
 Water_GC_even = Water_GC_odd;
@@ -84,7 +84,7 @@ R2_bipolar = Water_GC_odd;
 
 %% Graph-cut fat-water separation for odd and even echoes
 if VERBOSE
-    fprintf('\nFat-water separation for odd and even echo datasets slice ');
+    fprintf('Fat-water separation for odd and even echo datasets slice ');
 end
 for kk = vec_slices
 
@@ -152,7 +152,7 @@ end
 
 %% Binary fat and water mask (after thresholding using a specific values included in structure params)
 
-ff = zeros(size(c_ff));
+ff = zeros(matrix_size(1:3));
 
 ff (c_ff>=algoParams.weight) = 1;
 ff (c_ff<algoParams.weight) = 0;
@@ -207,9 +207,9 @@ options = optimoptions('lsqlin','Algorithm','trust-region-reflective','Display',
 tik_reg = algoParams.tik_reg;
 
 % Preallocate
-b1 = zeros(size(Water_GC_odd));
+b1 = zeros(matrix_size(1:3));
 b2 = b1;
-b = zeros([2 size(Water_GC_odd)]);
+b = zeros([2 matrix_size(1:3)]);
 solution_reg_real = b;
 solution_reg_imag = b;
 correction_map_unwrapped = b1;
@@ -219,7 +219,7 @@ if VERBOSE
     tic
     fprintf('\nPerforming pixel-wise least squares fitting...')
     reverseStr = '';
-    maxPerc = length(vec_slices)*size(Water_GC_odd,1);
+    maxPerc = length(vec_slices)*matrix_size(1);
     perc = 0;
 end
 
@@ -228,13 +228,13 @@ b2(:,:,vec_slices) = 0.5.*(log(Fat_GC_even(:,:,vec_slices)) - log(Fat_GC_odd(:,:
 b(:,:,:,vec_slices) = cat(1, reshape(wf(:,:,vec_slices).*b1(:,:,vec_slices), [1 size(wf(:,:,vec_slices))]), reshape(ff(:,:,vec_slices).*b2(:,:,vec_slices), [1 size(wf(:,:,vec_slices))]));
 
 for kk = vec_slices
-    for xx = 1:size(Water_GC_odd,1)
+    for xx = 1:matrix_size(1)
         if VERBOSE 
             perc = perc + 1;
             reverseStr = UpdatePercent(perc/maxPerc*100, reverseStr);
         end
 
-        for yy = 1:size(Water_GC_odd,2)
+        for yy = 1:matrix_size(2)
             if mask(xx,yy,kk) == 1
 
                 A = [1i*wf(xx,yy,kk),wf(xx,yy,kk);1i*ff(xx,yy,kk),ff(xx,yy,kk)];
@@ -600,7 +600,7 @@ end
 
 %% Deconvolving the effect of the errors introduce by the readout
 
-s0 = permute(input_signal_bipolar_RO, [length(size(input_signal_bipolar_RO)) 1:length(size(input_signal_bipolar_RO))-1]);
+s0 = permute(input_signal_bipolar_RO, [length(matrix_size) 1:length(matrix_size)-1]);
 s0 = reshape(s0,[numte numvox]);
 
 counter_t = reshape(1:numte,[numte 1]);
@@ -618,13 +618,11 @@ corrected_bipolar_signal = reshape(corrected_signal,matrix_size(1),matrix_size(2
 
 %% Fat water separation of the corrected signal
 
-algoParams.DO_OT = 1;
-
 imDataParams.TE = TEs_bipolar;
 
 if VERBOSE
     tic
-    fprintf('\nFat-water separation in synthetic unipolar dataset slice ');
+    fprintf('Fat-water separation in synthetic unipolar dataset slice ');
 end
 for kk = vec_slices
 
