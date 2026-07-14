@@ -84,7 +84,7 @@ R2_bipolar = Water_GC_odd;
 
 %% Graph-cut fat-water separation for odd and even echoes
 if VERBOSE
-    fprintf('Fat-water separation for odd and even echo datasets slice ');
+    fprintf('\nFat-water separation for odd and even echo datasets slice ');
 end
 for kk = vec_slices
 
@@ -622,7 +622,7 @@ imDataParams.TE = TEs_bipolar;
 
 if VERBOSE
     tic
-    fprintf('Fat-water separation in synthetic unipolar dataset slice ');
+    fprintf('\nFat-water separation in synthetic unipolar dataset slice ');
 end
 for kk = vec_slices
 
