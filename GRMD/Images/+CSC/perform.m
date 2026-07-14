@@ -73,6 +73,13 @@ function D = perform(D, flags)
             D.Data.Epsilon = outParams.eps_map; % related to amplitude modulation due to bipolar readout
             D.Data.BipolarError = outParams.bipolar_error_map_theta; % phi - i*eps;
             D.Data.Correction = outParams.total_correction; % correction to remove bipolar induced effects, e^(i*BipolarError)
+            
+            D.Data.WaterOdd = outParams.Water_GC_odd;
+            D.Data.FatOdd = outParams.Fat_GC_odd;
+            D.Data.WaterEven = outParams.Water_GC_even;
+            D.Data.FatEven = outParams.Fat_GC_even;
+            D.Data.TotalFieldDualGC = outParams.FieldMap_DualGC;
+            D.Data.R2StarDualGC = outParams.R2_DualGC;
 
         case 'vlGC'
             % Check parameters
