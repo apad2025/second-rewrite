@@ -65,6 +65,11 @@ TEs_bipolar = imDataParams.TE;
 
 mask = imDataParams.mask_fwseparation;
 
+% Generate logical mask same size as data
+if isscalar(mask) && mask==1
+    mask = true(matrix_size(1:3));
+end
+
 %% Memory allocation
 
 % Field maps and R2 star maps
