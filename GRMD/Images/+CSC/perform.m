@@ -65,8 +65,8 @@ function D = perform(D, flags)
 
             % Combine final data
             D.Data.Image = squeeze(outParams.corrected_bipolar_signal); % bipolar signal transformed into unipolar equivalent
-            D.Data.Water = outParams.species(2).amps;
-            D.Data.Fat = outParams.species(1).amps;
+            D.Data.Water = outParams.species(1).amps;
+            D.Data.Fat = outParams.species(2).amps;
             D.Data.TotalField = outParams.fieldmap;
             D.Data.R2Star = outParams.r2starmap;
             D.Data.Phi = outParams.phi_map; % related to phase modulation due to bipolar readout

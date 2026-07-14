@@ -4,7 +4,7 @@ clear; clc; close all
 
 slice = 12;
 
-path = "C:\Users\apad2\Desktop\second_rewrite\results\updated\second_run.mat";
+path = "";
 
 % The file may still hold the original D, or an already-extracted Data
 S = load(path);

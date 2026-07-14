@@ -19,8 +19,8 @@ function algoParams = grabPars(flags)
             algoParams.size_clique           = 1;               % Size of MRF neighborhood (1 uses an 8-neighborhood, common in 2D)
             algoParams.range_r2star          = [0 300];         % Range of R2* values
             algoParams.NUM_R2STARS           = 101;             % Number of R2* values for quantization (default = 11)
-            algoParams.range_fm              = [-500 500];      % Range of field map values
-            algoParams.NUM_FMS               = 1001;            % Number of field map values to discretize (default = 300)
+            algoParams.range_fm              = [-250 250];      % excludes the water/fat decoy minimum
+            algoParams.NUM_FMS               = 501;             % keeps the 1 Hz discretization
             algoParams.NUM_ITERS             = 40;              % Number of graph cut iterations
             algoParams.SUBSAMPLE             = flags.subsample; % Spatial subsampling for field map estimation (for speed)
             algoParams.DO_OT                 = 1;               % 0,1 flag to enable optimization transfer descent (final stage of field map estimation)
