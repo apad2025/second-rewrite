@@ -277,12 +277,6 @@ end
 phi_map = imag(correction_map);
 eps_map = real(correction_map);
 
-outParams.bipolar_error_map_theta = phi_map - 1i*eps_map;
-
-%% Total exponential term for correction
-
-total_correction = exp(1i*(phi_map - 1i*eps_map));%exp(2*correction_map).^(1/2);
-
 %% Comparison of initial guess and final solution for phi and eps maps
 
 % This plot shows water and fat specific phase error and amplitude
@@ -546,7 +540,7 @@ end
 % wraps. In case of wanting to use phase unwrapping, add to the directory
 % the code from Fortier and Levesque, DOI 10.1002/mrm.26989, 2017, https://gitlab.com/veronique_fortier/Quality_guided_unwrapping
 
-unwrapping = 0;
+unwrapping = 1;
 
 if unwrapping
 
@@ -554,14 +548,18 @@ if unwrapping
     unwrapped_map = zeros(size(eps_map));
 
     % Unwrapping
-    unwrapped_map(:,:,vec_slices) = qualityGuidedUnwrapping(squeeze(angle(complex_map1_combined(:,:,vec_slices))), squeeze(imDataParams.mask_fwseparation(:,:,vec_slices)), squeeze(abs(complex_map1_combined(:,:,vec_slices))));
+    unwrapped_map(:,:,vec_slices) = qualityGuidedUnwrapping(squeeze(imag(correction_map_unwrapped(:,:,vec_slices))), squeeze(imDataParams.mask_fwseparation(:,:,vec_slices)), squeeze(abs(complex_map1_combined(:,:,vec_slices))));
 
     % Calculation of phi map
-    phi_map(:,:,vec_slices) = -unwrapped_map(:,:,vec_slices)/2;
+    phi_map(:,:,vec_slices) = unwrapped_map(:,:,vec_slices);
 
 else % Keep phi map as least square result
     phi_map(isnan(phi_map))=0;
 end
+
+%% Total exponential term for correction
+
+total_correction = exp(1i*(phi_map - 1i*eps_map)); %exp(2*correction_map).^(1/2);
 
 %% Plot to check results
 
@@ -620,6 +618,8 @@ corrected_signal = s0 ./ (E);
 corrected_signal = permute(corrected_signal,[2 1]);
 
 corrected_bipolar_signal = reshape(corrected_signal,matrix_size(1),matrix_size(2),matrix_size(3),1,numte);
+
+outParams.bipolar_error_map_theta = phi_map - 1i*eps_map;
 
 %% Fat water separation of the corrected signal
 
