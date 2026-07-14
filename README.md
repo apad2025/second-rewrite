@@ -4,6 +4,7 @@
     - hernando
     - functions
     - bipolar_fat_water_separation
+    - Quality_guided_unwrapping
 - Change line 1559 `mainpth` variable in `dogexplorer.m`
 - Rerun `dogexplorer.m` to regenerage `DD.mat`
 - Change line 8 in `processeddogdata.m`
@@ -108,12 +109,13 @@ to
 
 Note: `pth_data` here MUST match `mainpth` in `dogexplorer.m` (line 1559). If the data root moves, update both.
 
-Add four `addpath` lines (after the path variables) so the code and its dependencies are on the MATLAB path:
+Add five `addpath` lines (after the path variables) so the code and its dependencies are on the MATLAB path:
 ```matlab
 addpath(genpath(pth_code))                                 % GRMD
 addpath(genpath("/scratch/user/apad/CREAM_PDFF/hernando")) % hernando
 addpath(genpath("/scratch/user/apad/functions"))           % external utilities (loadima, get_echoMIP, GenPlotRange, plotmygraph, ...)
 addpath(genpath("/scratch/user/apad/bipolar_fat_water_separation")) % Function_Bipolar_GC (BipolarIGC slice separation)
+addpath(genpath("/scratch/user/apad/Quality_guided_unwrapping")) % qualityGuidedUnwrapping (optional phase unwrapping in Function_Bipolar_GC)
 ```
 
 ## loadima.m

@@ -12,6 +12,7 @@ addpath(genpath(pth_code))                                 % GRMD
 addpath(genpath("/scratch/user/apad/CREAM_PDFF/hernando")) % hernando
 addpath(genpath("/scratch/user/apad/functions"))           % external utilities
 addpath(genpath("/scratch/user/apad/bipolar_fat_water_separation")) % Function_Bipolar_GC (BipolarIGC slice separation)
+addpath(genpath("/scratch/user/apad/Quality_guided_unwrapping")) % qualityGuidedUnwrapping (optional phase unwrapping in Function_Bipolar_GC)
 
 % Select dog & date (high PDFF are 4,3 & 2,3) (3,3 isn't finished being processed)
 % 1 - Waylon
