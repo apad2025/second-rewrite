@@ -62,6 +62,12 @@ function D = perform(D, flags)
             dataParams.mask_fwseparation = 1;
 
             outParams = Function_Bipolar_GC(dataParams, algoParams, 12, verboseFLAG);
+            
+            % save residual if outParams contains it
+            % if isfield(outParams, "residual")
+            %     residual = outParams.residual;
+            %     save("/scratch/user/apad/residuals/checkpoint", "residual");
+            % end
 
             % Combine final data
             D.Data.Image = squeeze(outParams.corrected_bipolar_signal); % bipolar signal transformed into unipolar equivalent

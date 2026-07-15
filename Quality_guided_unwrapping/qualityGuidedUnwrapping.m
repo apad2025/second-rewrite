@@ -77,9 +77,17 @@ im_phase_quality=SD.*im_mask;
 SE=strel('square',5);
 
 if volume
-    im_phase_qualityMask=im_phase_quality(:,:,round(matrixSize(3)/2)).*imerode(im_mask(:,:,round(matrixSize(3)/2)),SE);
+    if all(im_mask, "all")
+        im_phase_qualityMask=imgaussfilt(im_phase_quality(:,:,round(matrixSize(3)/2)),5).*imerode(im_mask(:,:,round(matrixSize(3)/2)),SE);
+    else
+        im_phase_qualityMask=im_phase_quality(:,:,round(matrixSize(3)/2)).*imerode(im_mask(:,:,round(matrixSize(3)/2)),SE);
+    end
 else
-    im_phase_qualityMask=im_phase_quality.*imerode(im_mask,SE);
+    if all(im_mask, "all")
+        im_phase_qualityMask=imgaussfilt(im_phase_quality,5).*imerode(im_mask,SE);
+    else
+        im_phase_qualityMask=im_phase_quality.*imerode(im_mask,SE);
+    end
 end
 im_phase_qualityMask=uint16(im_phase_qualityMask*100);
 im_phase_qualityMask(find(im_phase_qualityMask==0))=1000;   % Set region outside of im_mask to an arbitrary very low quality 

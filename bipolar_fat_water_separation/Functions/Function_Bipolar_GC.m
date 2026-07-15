@@ -760,6 +760,7 @@ outParams.Water_GC_even = Water_GC_even;
 outParams.Fat_GC_even = Fat_GC_even;
 outParams.FieldMap_DualGC = FieldMap_DualGC;
 outParams.R2_DualGC = R2_DualGC;
+outParams.residual = outParams_GC.residual;
 end
 
 % Update display percentage

@@ -183,6 +183,8 @@ else
     else
         % If not uniformly spaced TEs, get the residual for the whole range
         residual = computeResidual_Bipolar_GC(imDataParams, algoParams, VERBOSE);
+        % save residual if outParams contains it
+        save("/scratch/user/apad/residuals/checkpoint", "residual");
     end
 
 end
@@ -316,3 +318,4 @@ outParams.species(4).amps = f_even;
 
 outParams.r2starmap = r2starmap;
 outParams.fieldmap = fm;
+outParams.residual = residual;
