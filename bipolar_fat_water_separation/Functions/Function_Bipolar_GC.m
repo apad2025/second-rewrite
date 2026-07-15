@@ -157,13 +157,16 @@ end
 
 %% Binary fat and water mask (after thresholding using a specific values included in structure params)
 
-ff = zeros(matrix_size(1:3));
+% ff = zeros(matrix_size(1:3));
+% 
+% ff (c_ff>=algoParams.weight) = 1;
+% ff (c_ff<algoParams.weight) = 0;
+% 
+% ff = ff.*mask(:,:,:);
+% wf = (1 - ff).*mask(:,:,:);
 
-ff (c_ff>=algoParams.weight) = 1;
-ff (c_ff<algoParams.weight) = 0;
-
-ff = ff.*mask(:,:,:);
-wf = (1 - ff).*mask(:,:,:);
+ff = c_ff.*mask(:,:,:);
+wf = c_wf.*mask(:,:,:); % c_wf == 1 - c_ff, already clamped to [0,1]
 
 if algoParams.plot_debug
 % Binary mask derived from the initial fat fraction
