@@ -42,8 +42,8 @@ function algoParams = grabPars(flags)
             algoParams.size_clique           = 1;               % Size of MRF neighborhood (1 uses an 8-neighborhood, common in 2D)
             algoParams.range_r2star          = [0 300];         % Range of R2* values
             algoParams.NUM_R2STARS           = 101;             % Number of R2* values for quantization (default = 11)
-            algoParams.range_fm              = [-250 250];      % Excludes the water/fat decoy minimum (~-434 Hz at 3T)
-            algoParams.NUM_FMS               = 501;             % Keeps the 1 Hz discretization
+            algoParams.range_fm              = [-500 500];      % Range of field map values
+            algoParams.NUM_FMS               = 1001;            % Number of field map values to discretize (default = 300)
             algoParams.NUM_ITERS             = 80;              % Number of graph cut iterations
             algoParams.SUBSAMPLE             = flags.subsample; % Spatial subsampling for field map estimation (for speed)
             algoParams.DO_OT                 = 0;               % 0,1 flag to enable optimization transfer descent (final stage of field map estimation)
@@ -54,8 +54,8 @@ function algoParams = grabPars(flags)
             algoParams.tik_reg               = 0;               % Tikhonov regularization binary flag
             algoParams.plot_debug            = false;
             
-            if exist("/scratch/user/apad/residuals/checkpoint.m", "file")
-                load("/scratch/user/apad/residuals/checkpoint.m");
+            if exist("/scratch/user/apad/residuals/checkpoint.mat", "file")
+                load("/scratch/user/apad/residuals/checkpoint.mat");
                 algoParams.residual = residual;
             end
 

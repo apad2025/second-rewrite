@@ -540,7 +540,7 @@ end
 % wraps. In case of wanting to use phase unwrapping, add to the directory
 % the code from Fortier and Levesque, DOI 10.1002/mrm.26989, 2017, https://gitlab.com/veronique_fortier/Quality_guided_unwrapping
 
-unwrapping = 1;
+unwrapping = 0;
 
 if unwrapping
 
