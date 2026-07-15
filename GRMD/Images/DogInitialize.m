@@ -28,7 +28,7 @@ function [snames, DD, HDR, pth_1H, plrange, vout, filelocs] = DogInitialize(pth_
     end
 
     % Import data
-    load(append(pth_DD,"\DD"), 'DD')
+    load(fullfile(pth_DD,"DD"), 'DD')
 
     % Create path for 1H
     pth_1H = char(fullfile(DD(dog,date).Path.Main, '1H', 'Images', 'GRE'));

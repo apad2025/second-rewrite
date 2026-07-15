@@ -230,7 +230,7 @@ switch dtype
             twix = op_averaging(varargout{1});
 
             Covariance = cov(twix.specs);
-            save(fullfile(path, append("MID", string(MID), "_noiseCov.mat")),"Covariance")
+            save(append(path, "\MID", string(MID), "_noiseCov.mat"),"Covariance")
         elseif flags.verbose
             fprintf('\nData associated with given input:\n%s', ls)
         end
@@ -255,8 +255,8 @@ switch dtype
             fname_preproc_twix = append("MID", string(MID), "_preproc_twix.mat");
     
             % Create file paths
-            path_save_raw = fullfile(path_save, fname_raw);
-            path_save_preproc_twix = fullfile(path_save, fname_preproc_twix);
+            path_save_raw = join([path_save, fname_raw], '\');
+            path_save_preproc_twix = join([path_save, fname_preproc_twix], '\');
 
             % Check if files exist
             if ~exist(path_save_preproc_twix, 'file')
@@ -419,11 +419,11 @@ switch dtype
     
             % Load data
             if strcmp(dtype, 'Phosphorus')
-                path_raw = fullfile(path_save, append("MID", string(MID), "_preproc.mat"));
+                path_raw = join([path_save, append("\MID", string(MID), "_preproc.mat")], '\');
                 load(path_raw, 'Starting')
-                path_raw = fullfile(path_save, append("MID", string(MID), "_preproc_phased.mat"));
+                path_raw = join([path_save, append("\MID", string(MID), "_preproc_phased.mat")], '\');
                 load(path_raw, 'Processed')
-                path_raw = fullfile(path_save, append("MID", string(MID), "_preproc_twix.mat"));
+                path_raw = join([path_save, append("\MID", string(MID), "_preproc_twix.mat")], '\');
                 load(path_raw, 'twix')
 
                 twix.fids = squeeze(permute(Starting.Data, [3 1 2])); % Reshape starting data into twix format
@@ -439,7 +439,7 @@ switch dtype
                 end
 
             elseif any(strcmp(dtype, {'Hydrogen', 'HydrogenWatSup'}))
-                path_raw = fullfile(path_save, append("MID", string(MID), "_proc.mat"));
+                path_raw = join([path_save, append("\MID", string(MID), "_proc.mat")], '\');
                 twix = load(path_raw, 'McMRSData'); twix = twix.McMRSData;
 
                 % Check if PPM0 corrected
@@ -456,7 +456,7 @@ switch dtype
             end
 
             % Check for IV changes
-            path_opts = fullfile(path_save, append("MID", string(MID), "_OXSA_opts.mat"));
+            path_opts = join([path_save, append("\MID", string(MID), "_OXSA_opts.mat")], '\');
             if exist(path_opts, "file")
                 load(path_opts, 'opts')
             end
@@ -533,7 +533,7 @@ switch dtype
             title(sprintf('FQN=%.2f, FQN/SNR=%.5f, CoV=%0.2f', Results.GlobalFQN, Results.FQN_SNR, mean([Results.ParameterSDs.amplitude Results.ParameterSDs.linewidth Results.ParameterSDs.sigma]./[Results.Parameters.amplitude Results.Parameters.linewidth Results.Parameters.sigma],"all","omitmissing")))
 
             path = path_save;
-            path_save = fullfile(path_save, append("MID", string(MID), "_OXSA_results.mat"));
+            path_save = join([path_save, append("\MID", string(MID), "_OXSA_results.mat")], '\');
             save(path_save, "Results")
             varargout{1} = Results;
     
@@ -553,9 +553,9 @@ switch dtype
             clear i keeps
     
             % Generate full path
-            path_proc = fullfile(string(path_save), append("MID", string(MID), "_preproc_phased.mat"));
-            path_proc_twix = fullfile(path_save, append("MID", string(MID), "_preproc_phased_twix.mat"));
-            path_oxsa = fullfile(path_save, append("MID", string(MID), "_OXSA_results.mat"));
+            path_proc = join([string(path_save), append("MID", string(MID), "_preproc_phased.mat")], '\');
+            path_proc_twix = join([path_save, append("MID", string(MID), "_preproc_phased_twix.mat")], '\');
+            path_oxsa = join([path_save, append("MID", string(MID), "_OXSA_results.mat")], '\');
             
             nd = numel(MID); % number in dataset
 
@@ -566,7 +566,7 @@ switch dtype
                 % Load data
                 load(path_proc(diDx), "Processed")
                 load(path_oxsa(diDx), 'Results')
-                load(fullfile(path_save(diDx), append("MID", string(MID(diDx)), "_preproc_twix.mat")), 'twix');
+                load(join([path_save(diDx), append("MID", string(MID(diDx)), "_preproc_twix.mat")], '\'), 'twix');
 
                 % Shift data to center PCr at 0ppm
                 refPPM = Results.Parameters.chemShift(AMARES.getActualRefPeakDx(Results.Status.pkWithLinLsq));
@@ -1152,7 +1152,7 @@ end
         % error('This may be saving unsuppressed 1H data as suppressed 1H data')
 
         newRefPPM = 4.65*2 - newRefPPM;
-        Ps2change = fullfile(path_save, append("MID", string(MID), ["_raw.mat";"_preproc.mat";"_proc.mat"]))';
+        Ps2change = (path_save + "\" + append("MID", string(MID), ["_raw.mat";"_preproc.mat";"_proc.mat"]))';
         v = 0;
         for P = Ps2change
             load(P,'McMRSData')
@@ -1168,7 +1168,7 @@ end
             v = v + 1;
             varargout{v} = McMRSData; %#ok<AGROW>
         end
-        Ps2change = fullfile(path_save, append("MID", string(MID), ["_raw_twix.mat";"_preproc_twix.mat"]))';
+        Ps2change = (path_save + "\" + append("MID", string(MID), ["_raw_twix.mat";"_preproc_twix.mat"]))';
         for P = Ps2change
             load(P,'twix')
             twix.ppm = twix.ppm - 4.65 + newRefPPM;
@@ -1288,32 +1288,32 @@ end
         switch dtype
             case 'GRE'
                 for pDx = 1:length(subj)
-                    path_raw(pDx) = fullfile(DD(subj(pDx),sess(pDx)).Path.DICOM, DD(subj(pDx),sess(pDx)).GRE);
-                    path_save(pDx) = fullfile(DD(subj(pDx),sess(pDx)).Path.Main, paths.Hydrogen.Main, paths.Hydrogen.Images.Main, paths.Hydrogen.Images.GRE);
+                    path_raw(pDx) = join([DD(subj(pDx),sess(pDx)).Path.DICOM, DD(subj(pDx),sess(pDx)).GRE], '\');
+                    path_save(pDx) = join([DD(subj(pDx),sess(pDx)).Path.Main, paths.Hydrogen.Main, paths.Hydrogen.Images.Main, paths.Hydrogen.Images.GRE], '\');
                 end
             case 'Localizer'
                 for pDx = 1:length(subj)
-                    path_raw(pDx) = fullfile(DD(subj(pDx),sess(pDx)).Path.Main, paths.Hydrogen.Main);
-                    path_save(pDx) = fullfile(path_raw(pDx), paths.Hydrogen.Images.Main);
+                    path_raw(pDx) = join([DD(subj(pDx),sess(pDx)).Path.Main, paths.Hydrogen.Main], '\');
+                    path_save(pDx) = join([path_raw(pDx), paths.Hydrogen.Images.Main], '\');
                 end
             case 'HydrogenNoise'
                 for pDx = 1:length(subj)
-                    path_raw(pDx) = fullfile(DD(subj(pDx),sess(pDx)).Path.Main, paths.Hydrogen.Main);
-                    path_save(pDx) = fullfile(path_raw(pDx), paths.Hydrogen.Noise);
+                    path_raw(pDx) = join([DD(subj(pDx),sess(pDx)).Path.Main, paths.Hydrogen.Main], '\');
+                    path_save(pDx) = join([path_raw(pDx), paths.Hydrogen.Noise], '\');
                 end
             case 'Hydrogen'
                 for pDx = 1:length(subj)
-                    path_raw(pDx) = fullfile(DD(subj(pDx),sess(pDx)).Path.Main, paths.Hydrogen.Main);
-                    path_save(pDx) = fullfile(path_raw(pDx), paths.Hydrogen.Unsuppressed);
+                    path_raw(pDx) = join([DD(subj(pDx),sess(pDx)).Path.Main, paths.Hydrogen.Main], '\');
+                    path_save(pDx) = join([path_raw(pDx), paths.Hydrogen.Unsuppressed], '\');
                 end
             case 'HydrogenWatSup'
                 for pDx = 1:length(subj)
-                    path_raw(pDx) = fullfile(DD(subj(pDx),sess(pDx)).Path.Main, paths.Hydrogen.Main);
-                    path_save(pDx) = fullfile(path_raw(pDx), paths.Hydrogen.Suppressed);
+                    path_raw(pDx) = join([DD(subj(pDx),sess(pDx)).Path.Main, paths.Hydrogen.Main], '\');
+                    path_save(pDx) = join([path_raw(pDx), paths.Hydrogen.Suppressed], '\');
                 end
             case 'Phosphorus'
                 for pDx = 1:length(subj)
-                    path_raw(pDx) = fullfile(DD(subj(pDx),sess(pDx)).Path.Main, paths.Phosphorus);
+                    path_raw(pDx) = join([DD(subj(pDx),sess(pDx)).Path.Main, paths.Phosphorus], '\');
                     path_save(pDx) = path_raw(pDx);
                 end
         end
@@ -1410,7 +1410,7 @@ end
                 paths_tmp = [paths.Phosphorus, paths.Hydrogen.Main];
                 dtypes_tmp = ["Phosphorus", "Hydrogen"];
                 for m = 1:numel(dtypes_tmp)
-                    path_tmp = fullfile(DD(Subj,Sess).Path.Main, paths_tmp(m));
+                    path_tmp = join([DD(Subj,Sess).Path.Main, paths_tmp(m)], '\');
                     ls_tmp = ls(path_tmp);
                     for n = 1:size(ls_tmp,1) % iterate through folder contents
                         if strcmp(ls_tmp(n,11:13),MID)
@@ -1461,7 +1461,7 @@ end
                     MID = NaN;
 
                 case 'Localizer'
-                    path_tmp = fullfile(DD(Subj,Sess).Path.Main, paths.Hydrogen.Main, paths.Hydrogen.Images.Main);
+                    path_tmp = join([DD(Subj,Sess).Path.Main, paths.Hydrogen.Main, paths.Hydrogen.Images.Main], '\');
                     ls_tmp = ls(path_tmp);
                     locs = false(size(ls_tmp,1), 1);
                     for n = 1:size(ls_tmp,1)
@@ -1556,7 +1556,7 @@ end
 
         function [paths,Subject,Session,Phosphorus,HydrogenWatSup,Hydrogen,HydrogenNoise,DD] = Initialize
             % Initialize data
-            mainpth = "/scratch/user/apad/Fat_water_separation/DICOM_Files/";
+            mainpth = "C:\Users\apad2\Desktop\Fat_water_separation\DICOM_Files";
             paths = struct('Main', mainpth, ...
                      'Phosphorus', "31P", ...
                        'Hydrogen', struct('Main', "1H", ...
@@ -1611,15 +1611,15 @@ end
                     date = append("20", Session(I,J));
                     if sum(Session == Session(I,J),"all") > 1 % Two dogs in same 
                         
-                        DD(I,J).Path.Main = fullfile(paths.Main, date, Subject(I)); %#ok<AGROW>
+                        DD(I,J).Path.Main = join([paths.Main, date, Subject(I)], "\"); %#ok<AGROW>
                         if strcmp(Subject(I), "Aphrodite")
-                            DD(I,J).Path.DICOM = fullfile(paths.Main, "DICOM", append(date,"-1")); %#ok<AGROW>
+                            DD(I,J).Path.DICOM = join([paths.Main, "DICOM", append(date,"-1")], "\"); %#ok<AGROW>
                         elseif strcmp(Subject(I), "Selene")
-                            DD(I,J).Path.DICOM = fullfile(paths.Main, "DICOM", append(date,"-2")); %#ok<AGROW>
+                            DD(I,J).Path.DICOM = join([paths.Main, "DICOM", append(date,"-2")], "\"); %#ok<AGROW>
                         end
                     else
-                        DD(I,J).Path.Main = fullfile(paths.Main, date); %#ok<AGROW>
-                        DD(I,J).Path.DICOM = fullfile(paths.Main, "DICOM", date); %#ok<AGROW>
+                        DD(I,J).Path.Main = join([paths.Main, date], "\"); %#ok<AGROW>
+                        DD(I,J).Path.DICOM = join([paths.Main, "DICOM", date], "\"); %#ok<AGROW>
                     end
     
                     DD(I,J).Phosphorus = Phosphorus(I,J); %#ok<AGROW>
@@ -1635,7 +1635,7 @@ end
             end
     
             % Save
-            save(fullfile(mainpth, "DD.mat"), "DD")
+            save(join([mainpth, "DD.mat"], '\'), "DD")
         end
     end
 end

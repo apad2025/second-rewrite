@@ -5,7 +5,7 @@ clear; clc;
 autoFLAG = true;
 
 % Initialize path
-path = '/scratch/user/apad/Fat_water_separation/DICOM_Files/';
+path = 'C:\Users\apad2\Desktop\Fat_water_separation\DICOM_Files';
 
 switch autoFLAG
     case true

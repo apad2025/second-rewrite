@@ -3,9 +3,16 @@ clear; clc; close all
 % function DogAnalysis(dog, date)
 % error('min cut/=max-flow in max_flow')
 % Main path
-pth = "C:\Users\apad2\Desktop\Fat_water_separation\DICOM_Files";
-pth_main = pth + "_Project DMDiv\Dog Data";
-pth_code = "C:\Users\apad2\Desktop\second_rewrite\GRMD";
+% pth_main = pth + "_Project DMDiv\Dog Data";                       % legacy, unused on Linux
+pth_data = "/scratch/user/apad/Fat_water_separation/DICOM_Files";   % location of DD.mat (MUST match dogexplorer's mainpth)
+pth_code = "/scratch/user/apad/GRMD";                               % code root (kept for reference)
+
+% Add code to the MATLAB path
+addpath(genpath(pth_code))                                 % GRMD
+addpath(genpath("/scratch/user/apad/CREAM_PDFF/hernando")) % hernando
+addpath(genpath("/scratch/user/apad/functions"))           % external utilities
+addpath(genpath("/scratch/user/apad/bipolar_fat_water_separation")) % Function_Bipolar_GC (BipolarIGC slice separation)
+addpath(genpath("/scratch/user/apad/Quality_guided_unwrapping")) % qualityGuidedUnwrapping (optional phase unwrapping in Function_Bipolar_GC)
 
 % Select dog & date (high PDFF are 4,3 & 2,3) (3,3 isn't finished being processed)
 % 1 - Waylon
@@ -50,7 +57,7 @@ else
 end
 
 %% Load data
-[snames, DD, HDR, pth_1H, plrange, vout, filelocs] = DogInitialize(pth_code, dog, date, flags, cscFLAG); 
+[snames, DD, HDR, pth_1H, plrange, vout, filelocs] = DogInitialize(pth_data, dog, date, flags, cscFLAG);
 
 % Extract individual saves
 for i = 1:length(vout)
