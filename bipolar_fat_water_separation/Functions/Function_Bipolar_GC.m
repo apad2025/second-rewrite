@@ -165,8 +165,16 @@ end
 % ff = ff.*mask(:,:,:);
 % wf = (1 - ff).*mask(:,:,:);
 
+% option 1
 ff = c_ff.*mask(:,:,:);
 wf = c_wf.*mask(:,:,:); % c_wf == 1 - c_ff, already clamped to [0,1]
+
+% option 2
+% soft threshold: sharpness k controls how gradual the transition is
+% k = 10; % larger k means closer to the old binary behavior
+% ff = 1 ./ (1 + exp(-k*(c_ff - algoParams.weight)));
+% ff = ff.*mask(:,:,:);
+% wf = (1 - ff).*mask(:,:,:);
 
 if algoParams.plot_debug
 % Binary mask derived from the initial fat fraction
