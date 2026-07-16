@@ -53,6 +53,7 @@ function algoParams = grabPars(flags)
             algoParams.TRY_PERIODIC_RESIDUAL = 0;               % Take advantage of periodic residual if uniform TEs (will change range_fm)  
             algoParams.tik_reg               = 0;               % Tikhonov regularization binary flag
             algoParams.plot_debug            = false;
+            algoParams.parallel              = true;
             
             if exist("/scratch/user/apad/residuals/checkpoint.mat", "file")
                 load("/scratch/user/apad/residuals/checkpoint.mat");

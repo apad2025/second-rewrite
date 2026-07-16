@@ -74,8 +74,10 @@ end
 
 % Field maps and R2 star maps
 Water_GC_odd = zeros(matrix_size(1:3));
+residual = zeros([algoParams.NUM_FMS, matrix_size(1:3)]);
 if algoParams.parallel
     Water_GC_odd = squeeze(mat2cell(Water_GC_odd, matrix_size(1), matrix_size(2), ones([matrix_size(3),1])));
+    residual = squeeze(mat2cell(residual, algoParams.NUM_FMS, matrix_size(1), matrix_size(2), ones([matrix_size(3),1])));
 end
 
 Fat_GC_odd = Water_GC_odd;
@@ -104,11 +106,8 @@ if algoParams.parallel
         end
         nWorkers = max(1, min(nWorkers, numel(vec_slices)));
     end
-    existingPool = gcp('nocreate');
-    if isempty(existingPool) || existingPool.NumWorkers ~= nWorkers
-        delete(existingPool);
-        parpool('local', nWorkers);
-    end
+    delete(gcp('nocreate'));
+    parpool('local', nWorkers);
 
     fprintf("Number of workers is set to: %i", nWorkers);
 end
@@ -120,7 +119,6 @@ end
 
 if algoParams.parallel
     % assign only the relevant indexed parameters to each tmp worker
-    residuals = cell(matrix_size(3), 1);
     imDataParams_cell = Water_GC_odd;
     for kk = 1:matrix_size(3)
         imDataParams_cell{kk} = imDataParams;
@@ -150,7 +148,7 @@ if algoParams.parallel
     Fat_GC_even = cell2mat(reshape(Fat_GC_even,[1 1 matrix_size(3)]));
     FieldMap_DualGC = cell2mat(reshape(FieldMap_DualGC,[1 1 matrix_size(3)]));
     R2_DualGC = cell2mat(reshape(R2_DualGC,[1 1 matrix_size(3)]));
-    residual = cell2mat(reshape(residual,[1 1 matrix_size(3)]));
+    residual = cell2mat(reshape(residual,[1 1 1 matrix_size(3)]));
 
 else
     for kk = vec_slices
