@@ -14,8 +14,8 @@ function D = perform(D, flags)
     if flags.zipped, mnw = 4; else, mnw = 6; end
 
     % Isolate flags
-    % verboseFLAG = flags.verbose;
-    verboseFLAG = false;
+    verboseFLAG = flags.verbose;
+    % verboseFLAG = false;
     flags = flags.cscorrection;
 
     % Format data to correct shape
@@ -62,7 +62,7 @@ function D = perform(D, flags)
             dataParams.images = images;
             dataParams.mask_fwseparation = 1;
 
-            outParams = Function_Bipolar_GC(dataParams, algoParams, 1:D.Size(3), verboseFLAG);
+            outParams = Function_Bipolar_GC(dataParams, algoParams, 12:16, verboseFLAG);
             
             % save residual if outParams contains it
             % if isfield(outParams, "residual")

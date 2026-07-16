@@ -25,7 +25,8 @@ if validParams==0
     return
 end
 
-if nargin < 4 || algoParams.parallel
+% if nargin < 4 || algoParams.parallel
+if nargin < 4
     VERBOSE = false;
 end
 
@@ -68,6 +69,7 @@ mask = imDataParams.mask_fwseparation;
 % Generate logical mask same size as data
 if isscalar(mask) && mask==1
     mask = true(matrix_size(1:3));
+    imDataParams.mask_fwseparation = mask;
 end
 
 %% Memory allocation
@@ -107,7 +109,19 @@ if algoParams.parallel
         nWorkers = max(1, min(nWorkers, numel(vec_slices)));
     end
     delete(gcp('nocreate'));
-    parpool('local', nWorkers);
+    c = parcluster('local');
+    
+    % fix queue issue
+    jobid = getenv('SLURM_JOB_ID');
+    if ~isempty(jobid)
+        storage = fullfile(tempdir, ['matlab_pool_' jobid]);
+        if ~exist(storage, 'dir')
+            mkdir(storage);
+        end
+        c.JobStorageLocation = storage;
+    end
+    c.NumWorkers = max(c.NumWorkers, nWorkers);
+    parpool(c, nWorkers);
 
     fprintf("Number of workers is set to: %i", nWorkers);
 end
@@ -123,7 +137,7 @@ if algoParams.parallel
     for kk = 1:matrix_size(3)
         imDataParams_cell{kk} = imDataParams;
         imDataParams_cell{kk}.images = imDataParams_cell{kk}.images(:,:,kk,:,:);
-        imDataParams_cell{kk}.mask = imDataParams_cell{kk}.mask(:,:,kk);
+        imDataParams_cell{kk}.mask_fwseparation = imDataParams_cell{kk}.mask_fwseparation(:,:,kk);
         imDataParams_cell{kk}.sliceofint = kk;
     end
 
@@ -138,7 +152,7 @@ if algoParams.parallel
     
         FieldMap_DualGC{kk} = outParams_GC.fieldmap;
         R2_DualGC{kk} = outParams_GC.r2starmap;
-        residuals{kk} = outParams_GC.residual;
+        residual{kk} = outParams_GC.residual;
     end
 
     % Extract from cell arrays
