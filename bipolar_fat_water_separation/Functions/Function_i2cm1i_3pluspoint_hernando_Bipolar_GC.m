@@ -183,8 +183,13 @@ else
     else
         % If not uniformly spaced TEs, get the residual for the whole range
         residual = computeResidual_Bipolar_GC(imDataParams, algoParams, VERBOSE);
-        % save residual if outParams contains it
-        save("/scratch/user/apad/residuals/checkpoint", "residual");
+        % Checkpoint the residual. Use a slice-specific filename so that
+        % concurrent parfor workers do not race on a single shared file.
+        % if isfield(imDataParams, 'sliceofint')
+        %     save(sprintf("/scratch/user/apad/residuals/checkpoint_slice%03d", imDataParams.sliceofint), "residual");
+        % else
+        %     save("/scratch/user/apad/residuals/checkpoint", "residual");
+        % end
     end
 
 end

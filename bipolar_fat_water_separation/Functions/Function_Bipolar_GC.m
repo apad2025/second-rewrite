@@ -17,16 +17,16 @@
 
 function outParams = Function_Bipolar_GC(imDataParams, algoParams , vec_slices, VERBOSE)
 
-if nargin < 4
-    VERBOSE = false;
-end
-
 % Check validity of params, and set default algorithm parameters if not provided
 [validParams,algoParams] = checkParamsAndSetDefaults_graphcut_Bipolar_GC(imDataParams,algoParams,vec_slices);
 if validParams==0
     disp('Exiting -- data not processed');
     outParams = [];
     return
+end
+
+if nargin < 4 || algoParams.parallel
+    VERBOSE = false;
 end
 
 % The size of the input signal needs to be [3D 1 #echoes], the ones is to
@@ -74,6 +74,10 @@ end
 
 % Field maps and R2 star maps
 Water_GC_odd = zeros(matrix_size(1:3));
+if algoParams.parallel
+    Water_GC_odd = squeeze(mat2cell(Water_GC_odd, matrix_size(1), matrix_size(2), ones([matrix_size(3),1])));
+end
+
 Fat_GC_odd = Water_GC_odd;
 
 Water_GC_even = Water_GC_odd;
@@ -86,29 +90,88 @@ Water_bipolar = Water_GC_odd;
 Fat_bipolar = Water_GC_odd;
 FieldMap_bipolar = Water_GC_odd;
 R2_bipolar = Water_GC_odd;
+residual = Water_GC_odd;
+
+%% Parallel pool sized to the SLURM allocation
+if algoParams.parallel
+    % Falls back to local core count if not sized to SLURM core count
+    if isfield(algoParams, 'nWorkers')
+        nWorkers = algoParams.nWorkers;
+    else
+        nWorkers = str2double(getenv('SLURM_CPUS_PER_TASK'));
+        if isnan(nWorkers) || nWorkers < 1
+            nWorkers = maxNumCompThreads;
+        end
+        nWorkers = max(1, min(nWorkers, numel(vec_slices)));
+    end
+    existingPool = gcp('nocreate');
+    if isempty(existingPool) || existingPool.NumWorkers ~= nWorkers
+        delete(existingPool);
+        parpool('local', nWorkers);
+    end
+
+    fprintf("Number of workers is set to: %i", nWorkers);
+end
 
 %% Graph-cut fat-water separation for odd and even echoes
 if VERBOSE
     fprintf('\nFat-water separation for odd and even echo datasets slice ');
 end
-for kk = vec_slices
 
-    if VERBOSE
-        fprintf([num2str(kk) ', ']);
+if algoParams.parallel
+    % assign only the relevant indexed parameters to each tmp worker
+    residuals = cell(matrix_size(3), 1);
+    imDataParams_cell = Water_GC_odd;
+    for kk = 1:matrix_size(3)
+        imDataParams_cell{kk} = imDataParams;
+        imDataParams_cell{kk}.images = imDataParams_cell{kk}.images(:,:,kk,:,:);
+        imDataParams_cell{kk}.mask = imDataParams_cell{kk}.mask(:,:,kk);
+        imDataParams_cell{kk}.sliceofint = kk;
     end
 
-    imDataParams.sliceofint = kk;
-    outParams_GC = Function_i2cm1i_3pluspoint_hernando_Bipolar_GC(imDataParams, algoParams, VERBOSE);
+    parfor kk = vec_slices
+        outParams_GC = Function_i2cm1i_3pluspoint_hernando_Bipolar_GC(imDataParams_cell{kk}, algoParams, VERBOSE);
+    
+        Water_GC_odd{kk} = outParams_GC.species(1).amps;
+        Fat_GC_odd{kk} = outParams_GC.species(2).amps;
+    
+        Water_GC_even{kk} = (outParams_GC.species(3).amps);
+        Fat_GC_even{kk} = (outParams_GC.species(4).amps);
+    
+        FieldMap_DualGC{kk} = outParams_GC.fieldmap;
+        R2_DualGC{kk} = outParams_GC.r2starmap;
+        residuals{kk} = outParams_GC.residual;
+    end
 
-    Water_GC_odd(:,:,kk) = outParams_GC.species(1).amps;
-    Fat_GC_odd(:,:,kk) = outParams_GC.species(2).amps;
+    % Extract from cell arrays
+    Water_GC_odd = cell2mat(reshape(Water_GC_odd,[1 1 matrix_size(3)]));
+    Fat_GC_odd = cell2mat(reshape(Fat_GC_odd,[1 1 matrix_size(3)]));
+    Water_GC_even = cell2mat(reshape(Water_GC_even,[1 1 matrix_size(3)]));
+    Fat_GC_even = cell2mat(reshape(Fat_GC_even,[1 1 matrix_size(3)]));
+    FieldMap_DualGC = cell2mat(reshape(FieldMap_DualGC,[1 1 matrix_size(3)]));
+    R2_DualGC = cell2mat(reshape(R2_DualGC,[1 1 matrix_size(3)]));
+    residual = cell2mat(reshape(residual,[1 1 matrix_size(3)]));
 
-    Water_GC_even(:,:,kk) = (outParams_GC.species(3).amps);
-    Fat_GC_even(:,:,kk) = (outParams_GC.species(4).amps);
+else
+    for kk = vec_slices
 
-    FieldMap_DualGC(:,:,kk) = outParams_GC.fieldmap;
-    R2_DualGC(:,:,kk) = outParams_GC.r2starmap;
+        if VERBOSE
+            fprintf([num2str(kk) ', ']);
+        end
 
+        imDataParams.sliceofint = kk;
+        outParams_GC = Function_i2cm1i_3pluspoint_hernando_Bipolar_GC(imDataParams, algoParams, VERBOSE);
+
+        Water_GC_odd(:,:,kk) = outParams_GC.species(1).amps;
+        Fat_GC_odd(:,:,kk) = outParams_GC.species(2).amps;
+
+        Water_GC_even(:,:,kk) = (outParams_GC.species(3).amps);
+        Fat_GC_even(:,:,kk) = (outParams_GC.species(4).amps);
+
+        FieldMap_DualGC(:,:,kk) = outParams_GC.fieldmap;
+        R2_DualGC(:,:,kk) = outParams_GC.r2starmap;
+        residual(:,:,kk) = outParams_GC.residual;
+    end
 end
 
 %% Fat and water fraction masks generation
@@ -224,58 +287,102 @@ tik_reg = algoParams.tik_reg;
 
 % Preallocate
 b1 = zeros(matrix_size(1:3));
-b2 = b1;
 b = zeros([2 matrix_size(1:3)]);
-solution_reg_real = b;
-solution_reg_imag = b;
+b2 = b1;
 correction_map_unwrapped = b1;
 correction_map = b1;
 
-if VERBOSE
-    tic
-    fprintf('\nPerforming pixel-wise least squares fitting...')
-    reverseStr = '';
-    maxPerc = length(vec_slices)*matrix_size(1);
-    perc = 0;
-end
-
+% Calculate b matrix
 b1(:,:,vec_slices) = 0.5.*(log(Water_GC_even(:,:,vec_slices)) - log(Water_GC_odd(:,:,vec_slices)));
 b2(:,:,vec_slices) = 0.5.*(log(Fat_GC_even(:,:,vec_slices)) - log(Fat_GC_odd(:,:,vec_slices)));
 b(:,:,:,vec_slices) = cat(1, reshape(wf(:,:,vec_slices).*b1(:,:,vec_slices), [1 size(wf(:,:,vec_slices))]), reshape(ff(:,:,vec_slices).*b2(:,:,vec_slices), [1 size(wf(:,:,vec_slices))]));
 
-for kk = vec_slices
-    for xx = 1:matrix_size(1)
-        if VERBOSE 
-            perc = perc + 1;
-            reverseStr = UpdatePercent(perc/maxPerc*100, reverseStr);
-        end
+if algoParams.parallel
+    % Cell allocation
+    b = squeeze(mat2cell(b1, matrix_size(1), matrix_size(2), ones([matrix_size(3),1])));
+    mask = squeeze(mat2cell(mask, matrix_size(1), matrix_size(2), ones([matrix_size(3),1])));
+    wf = squeeze(mat2cell(wf, matrix_size(1), matrix_size(2), ones([matrix_size(3),1])));
+    ff = squeeze(mat2cell(ff, matrix_size(1), matrix_size(2), ones([matrix_size(3),1])));
+    phi_map_init = squeeze(mat2cell(phi_map_init, matrix_size(1), matrix_size(2), ones([matrix_size(3),1])));
+    correction_map_unwrapped = squeeze(mat2cell(zeros(matrix_size(1:3)), matrix_size(1), matrix_size(2), ones([matrix_size(3),1])));
+    correction_map = squeeze(mat2cell(zeros(matrix_size(1:3)), matrix_size(1), matrix_size(2), ones([matrix_size(3),1])));
 
-        for yy = 1:matrix_size(2)
-            if mask(xx,yy,kk) == 1
+    parfor kk = vec_slices
+        % Initialize/clear solution array
+        solution_reg_real = zeros([2 matrix_size(1:2)]);
+        solution_reg_imag = solution_reg_real;
 
-                A = [1i*wf(xx,yy,kk),wf(xx,yy,kk);1i*ff(xx,yy,kk),ff(xx,yy,kk)];
-
-                A_tik = ctranspose(A)*A + tik_reg*eye(2);
-                b_tik = ctranspose(A) * b(:,xx,yy,kk);
-
-                if tik_reg == 0
-                    solution_reg_real(:,xx,yy,kk) = lsqminnorm(real(A),real(b(:,xx,yy,kk)));
-                    solution_reg_imag(:,xx,yy,kk) = lsqlin(imag(A),imag(b(:,xx,yy,kk)),[],[],[],[],[-pi;-pi],[pi;pi],[phi_map_init(xx,yy,kk);0],options);
-                else
-                    solution_reg_real(:,xx,yy,kk) = lsqminnorm(real(A_tik),real(b_tik));
-                    solution_reg_imag(:,xx,yy,kk) = lsqlin(imag(A_tik),imag(b_tik),[],[],[],[],[-pi;-pi],[pi;pi],[phi_map_init(xx,yy,kk);0],options);
+        for xx = 1:matrix_size(1)
+            for yy = 1:matrix_size(2)
+                if mask{kk} == 1
+    
+                    A = [1i*wf{kk},wf{kk};1i*ff{kk},ff{kk}];
+    
+                    A_tik = ctranspose(A)*A + tik_reg*eye(2);
+                    b_tik = ctranspose(A) * b{kk};
+    
+                    if tik_reg == 0
+                        solution_reg_real = lsqminnorm(real(A),real(b{kk}));
+                        solution_reg_imag = lsqlin(imag(A),imag(b{kk}),[],[],[],[],[-pi;-pi],[pi;pi],[phi_map_init{kk};0],options);
+                    else
+                        solution_reg_real = lsqminnorm(real(A_tik),real(b_tik));
+                        solution_reg_imag = lsqlin(imag(A_tik),imag(b_tik),[],[],[],[],[-pi;-pi],[pi;pi],[phi_map_init{kk};0],options);
+                    end
                 end
             end
         end
+
+        correction_map_unwrapped{kk} = squeeze(1i.*solution_reg_imag(1,:,:) + solution_reg_real(2,:,:));
+
+        % Apply artificial wrap
+        solution_reg_imag2 = squeeze(solution_reg_imag(1,:,:));
+        solution_reg_imag2(solution_reg_imag2>pi/2) = solution_reg_imag2(solution_reg_imag2>pi/2) - pi;
+        solution_reg_imag2(solution_reg_imag2<-pi/2) = solution_reg_imag2(solution_reg_imag2<-pi/2) + pi;
+        correction_map{kk} = 1i.*solution_reg_imag2 + squeeze(solution_reg_real(2,:,:));
     end
 
-    correction_map_unwrapped(:,:,kk) = squeeze(1i.*solution_reg_imag(1,:,:,kk) + solution_reg_real(2,:,:,kk));
+    correction_map_unwrapped = cell2mat(reshape(correction_map_unwrapped,[1 1 matrix_size(3)]));
+    correction_map = cell2mat(reshape(correction_map,[1 1 matrix_size(3)]));
 
-    % Apply artificial wrap
-    solution_reg_imag2 = squeeze(solution_reg_imag(1,:,:,kk));
-    solution_reg_imag2(solution_reg_imag2>pi/2) = solution_reg_imag2(solution_reg_imag2>pi/2) - pi;
-    solution_reg_imag2(solution_reg_imag2<-pi/2) = solution_reg_imag2(solution_reg_imag2<-pi/2) + pi;
-    correction_map(:,:,kk) = 1i.*solution_reg_imag2 + squeeze(solution_reg_real(2,:,:,kk));
+else
+    for kk = vec_slices
+        % Initialize/clear solution array
+        solution_reg_real = zeros([2 matrix_size(1:2)]);
+        solution_reg_imag = solution_reg_real;
+
+        for xx = 1:matrix_size(1)
+            if VERBOSE 
+                perc = perc + 1;
+                reverseStr = UpdatePercent(perc/maxPerc*100, reverseStr);
+            end
+
+            for yy = 1:matrix_size(2)
+                if mask(xx,yy,kk) == 1
+
+                    A = [1i*wf(xx,yy,kk),wf(xx,yy,kk);1i*ff(xx,yy,kk),ff(xx,yy,kk)];
+
+                    A_tik = ctranspose(A)*A + tik_reg*eye(2);
+                    b_tik = ctranspose(A) * b(:,xx,yy,kk);
+
+                    if tik_reg == 0
+                        solution_reg_real(:,xx,yy,kk) = lsqminnorm(real(A),real(b(:,xx,yy,kk)));
+                        solution_reg_imag(:,xx,yy,kk) = lsqlin(imag(A),imag(b(:,xx,yy,kk)),[],[],[],[],[-pi;-pi],[pi;pi],[phi_map_init(xx,yy,kk);0],options);
+                    else
+                        solution_reg_real(:,xx,yy,kk) = lsqminnorm(real(A_tik),real(b_tik));
+                        solution_reg_imag(:,xx,yy,kk) = lsqlin(imag(A_tik),imag(b_tik),[],[],[],[],[-pi;-pi],[pi;pi],[phi_map_init(xx,yy,kk);0],options);
+                    end
+                end
+            end
+        end
+
+        correction_map_unwrapped(:,:,kk) = squeeze(1i.*solution_reg_imag(1,:,:,kk) + solution_reg_real(2,:,:,kk));
+
+        % Apply artificial wrap
+        solution_reg_imag2 = squeeze(solution_reg_imag(1,:,:,kk));
+        solution_reg_imag2(solution_reg_imag2>pi/2) = solution_reg_imag2(solution_reg_imag2>pi/2) - pi;
+        solution_reg_imag2(solution_reg_imag2<-pi/2) = solution_reg_imag2(solution_reg_imag2<-pi/2) + pi;
+        correction_map(:,:,kk) = 1i.*solution_reg_imag2 + squeeze(solution_reg_real(2,:,:,kk));
+    end
 end
 
 if VERBOSE
@@ -640,22 +747,45 @@ if VERBOSE
     tic
     fprintf('\nFat-water separation in synthetic unipolar dataset slice ');
 end
-for kk = vec_slices
 
-    if VERBOSE
-        fprintf([num2str(kk) ', ']);
+
+if algoParams.parallel
+    % Allocate updated image data
+    for kk = 1:matrix_size(3)
+        imDataParams_cell{kk}.images = corrected_bipolar_signal(:,:,kk,:,:);
     end
-    imDataParams.images = corrected_bipolar_signal(:,:,kk,:,:); % Originaly size[nx,ny,nz,ncoils,nechoes] Note: This specific order is required for GC algorithm
 
-    outParams_bipolar = fw_i2cm1i_3pluspoint_hernando_graphcut(imDataParams, algoParams, false);
+    parfor kk = vec_slices        
+        outParams_bipolar = fw_i2cm1i_3pluspoint_hernando_graphcut(imDataParams_cell{kk}, algoParams, false);
+    
+        Water_bipolar{kk} = outParams_bipolar.species(1).amps;
+        Fat_bipolar{kk} = outParams_bipolar.species(2).amps;
+        FieldMap_bipolar{kk} = outParams_bipolar.fieldmap;
+        R2_bipolar{kk} = outParams_bipolar.r2starmap;
+    end
 
-    Water_bipolar(:,:,kk) = outParams_bipolar.species(1).amps;
-    Fat_bipolar(:,:,kk) = outParams_bipolar.species(2).amps;
-    FieldMap_bipolar(:,:,kk) = outParams_bipolar.fieldmap;
-    R2_bipolar(:,:,kk) = outParams_bipolar.r2starmap;
+    % Extract from cell arrays
+    Water_bipolar = cell2mat(reshape(Water_bipolar,[1 1 matrix_size(3)]));
+    Fat_bipolar = cell2mat(reshape(Fat_bipolar,[1 1 matrix_size(3)]));
+    FieldMap_bipolar = cell2mat(reshape(FieldMap_bipolar,[1 1 matrix_size(3)]));
+    R2_bipolar = cell2mat(reshape(R2_bipolar,[1 1 matrix_size(3)]));
 
-    %slice_image = sliceNb_ROI;%1;
+else
+    for kk = vec_slices
+        if VERBOSE
+            fprintf([num2str(kk) ', ']);
+        end
+        imDataParams.images = corrected_bipolar_signal(:,:,kk,:,:); % Originaly size[nx,ny,nz,ncoils,nechoes] Note: This specific order is required for GC algorithm
+
+        outParams_bipolar = fw_i2cm1i_3pluspoint_hernando_graphcut(imDataParams, algoParams, false);
+
+        Water_bipolar(:,:,kk) = outParams_bipolar.species(1).amps;
+        Fat_bipolar(:,:,kk) = outParams_bipolar.species(2).amps;
+        FieldMap_bipolar(:,:,kk) = outParams_bipolar.fieldmap;
+        R2_bipolar(:,:,kk) = outParams_bipolar.r2starmap;
+    end
 end
+
 if VERBOSE
     tttime = toc;
     fprintf('. Done (%.2f sec)', tttime)
@@ -771,7 +901,9 @@ outParams.Water_GC_even = Water_GC_even;
 outParams.Fat_GC_even = Fat_GC_even;
 outParams.FieldMap_DualGC = FieldMap_DualGC;
 outParams.R2_DualGC = R2_DualGC;
-outParams.residual = outParams_GC.residual;
+% Preserve prior behavior: keep the residual of the last processed slice
+% (outParams_GC no longer survives the parfor loop above).
+outParams.residual = residuals{vec_slices(end)};
 end
 
 % Update display percentage

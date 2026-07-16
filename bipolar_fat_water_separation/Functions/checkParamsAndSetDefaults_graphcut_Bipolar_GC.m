@@ -142,6 +142,13 @@ else
     algoParams2.gyro = 42.5774780505984;
 end
 
+%%   - algoParams.parallel = false (control whether or not parfor is enabled)
+if isfield(algoParams, 'parallel')
+    algoParams2.parallel = algoParams.parallel;
+else
+    algoParams2.parallel = false;
+end
+
 %% Extra parameters to enable fat-water separation with bipolar readouts
 
 %% - imDataParams.mask_fwseparation (binary mask to perform fat-water separation in voxels within the mask)

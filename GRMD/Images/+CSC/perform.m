@@ -14,7 +14,8 @@ function D = perform(D, flags)
     if flags.zipped, mnw = 4; else, mnw = 6; end
 
     % Isolate flags
-    verboseFLAG = flags.verbose;
+    % verboseFLAG = flags.verbose;
+    verboseFLAG = false;
     flags = flags.cscorrection;
 
     % Format data to correct shape
