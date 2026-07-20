@@ -13,6 +13,6 @@ if FLAG
     if isfield(D.Data, 'Mask')
         D.Data.Mask = D.Data.Mask > 0;
     end
-    save(char(fullfile(path, [sname, '.mat'])), "D");
+    save(char(fullfile(path, [sname, '.mat'])), "D", "-v7.3");
 end
 end

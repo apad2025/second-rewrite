@@ -44,7 +44,7 @@ function algoParams = grabPars(flags)
             algoParams.NUM_R2STARS           = 101;             % Number of R2* values for quantization (default = 11)
             algoParams.range_fm              = [-500 500];      % Range of field map values
             algoParams.NUM_FMS               = 1001;            % Number of field map values to discretize (default = 300)
-            algoParams.NUM_ITERS             = 80;              % Number of graph cut iterations
+            algoParams.NUM_ITERS             = 120;             % Number of graph cut iterations
             algoParams.SUBSAMPLE             = flags.subsample; % Spatial subsampling for field map estimation (for speed)
             algoParams.DO_OT                 = 0;               % 0,1 flag to enable optimization transfer descent (final stage of field map estimation)
             algoParams.LMAP_POWER            = 2;               % Spatially-varying regularization (2 gives ~ uniformn resolution)

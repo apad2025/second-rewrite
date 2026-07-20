@@ -161,8 +161,12 @@ end
 %% - algoParams.slice_image (slice to display images to preview results of fat-water separation)
 if isfield(algoParams, 'slice_image')
     algoParams2.slice_image = algoParams.slice_image;
-elseif nargin > 2 && isscalar(vec_slices)
-    algoParams2.slice_image = vec_slices;
+elseif nargin > 2
+    if isscalar(vec_slices)
+        algoParams2.slice_image = vec_slices;
+    else 
+        algoParams2.slice_image = vec_slices(round(numel(vec_slices)/2));
+    end
 else
     algoParams2.slice_image = round(size(imDataParams.images,3)/2);
 end

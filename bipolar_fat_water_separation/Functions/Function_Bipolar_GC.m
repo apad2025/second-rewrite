@@ -53,6 +53,7 @@ input_signal_bipolar_RO = imDataParams.images;
 
 matrix_size = size(input_signal_bipolar_RO);
 numvox = prod(matrix_size(1:3));
+nSlices = numel(vec_slices);
 
 %% Number of echoes
 
@@ -76,10 +77,13 @@ end
 
 % Field maps and R2 star maps
 Water_GC_odd = zeros(matrix_size(1:3));
-residual = zeros([algoParams.NUM_FMS, matrix_size(1:3)]);
+% residual = zeros([algoParams.NUM_FMS, matrix_size(1:3)]);
 if algoParams.parallel
-    Water_GC_odd = squeeze(mat2cell(Water_GC_odd, matrix_size(1), matrix_size(2), ones([matrix_size(3),1])));
-    residual = squeeze(mat2cell(residual, algoParams.NUM_FMS, matrix_size(1), matrix_size(2), ones([matrix_size(3),1])));
+    Water_GC_odd = cell(matrix_size(3),1);
+    for kk = vec_slices
+        Water_GC_odd{kk} = zeros(matrix_size(1:2));
+    % residual = squeeze(mat2cell(residual, algoParams.NUM_FMS, matrix_size(1), matrix_size(2), ones([matrix_size(3),1])));
+    end
 end
 
 Fat_GC_odd = Water_GC_odd;
@@ -94,7 +98,6 @@ Water_bipolar = Water_GC_odd;
 Fat_bipolar = Water_GC_odd;
 FieldMap_bipolar = Water_GC_odd;
 R2_bipolar = Water_GC_odd;
-residual = Water_GC_odd;
 
 %% Parallel pool sized to the SLURM allocation
 if algoParams.parallel
@@ -134,10 +137,10 @@ end
 if algoParams.parallel
     % assign only the relevant indexed parameters to each tmp worker
     imDataParams_cell = Water_GC_odd;
-    for kk = 1:matrix_size(3)
+    for kk = vec_slices
         imDataParams_cell{kk} = imDataParams;
-        imDataParams_cell{kk}.images = imDataParams_cell{kk}.images(:,:,kk,:,:);
-        imDataParams_cell{kk}.mask_fwseparation = imDataParams_cell{kk}.mask_fwseparation(:,:,kk);
+        imDataParams_cell{kk}.images = imDataParams.images(:,:,kk,:,:);
+        imDataParams_cell{kk}.mask = mask(:,:,kk);
         imDataParams_cell{kk}.sliceofint = kk;
     end
 
@@ -152,17 +155,25 @@ if algoParams.parallel
     
         FieldMap_DualGC{kk} = outParams_GC.fieldmap;
         R2_DualGC{kk} = outParams_GC.r2starmap;
-        residual{kk} = outParams_GC.residual;
+        % residual{kk} = outParams_GC.residual;
     end
 
     % Extract from cell arrays
-    Water_GC_odd = cell2mat(reshape(Water_GC_odd,[1 1 matrix_size(3)]));
-    Fat_GC_odd = cell2mat(reshape(Fat_GC_odd,[1 1 matrix_size(3)]));
-    Water_GC_even = cell2mat(reshape(Water_GC_even,[1 1 matrix_size(3)]));
-    Fat_GC_even = cell2mat(reshape(Fat_GC_even,[1 1 matrix_size(3)]));
-    FieldMap_DualGC = cell2mat(reshape(FieldMap_DualGC,[1 1 matrix_size(3)]));
-    R2_DualGC = cell2mat(reshape(R2_DualGC,[1 1 matrix_size(3)]));
-    residual = cell2mat(reshape(residual,[1 1 1 matrix_size(3)]));
+    Water_GC_odd_cell = Water_GC_odd; Water_GC_odd = zeros(matrix_size);
+    Fat_GC_odd_cell = Fat_GC_odd; Fat_GC_odd = Water_GC_odd;
+    Water_GC_even_cell = Water_GC_even; Water_GC_even = Water_GC_odd;
+    Fat_GC_even_cell = Fat_GC_even; Fat_GC_even = Water_GC_odd;
+    FieldMap_DualGC_cell = FieldMap_DualGC; FieldMap_DualGC = Water_GC_odd;
+    R2_DualGC_cell = R2_DualGC; R2_DualGC = Water_GC_odd;
+    for kk = vec_slices
+        Water_GC_odd(:,:,kk) = Water_GC_odd_cell{kk};
+        Fat_GC_odd(:,:,kk) = Fat_GC_odd_cell{kk};
+        Water_GC_even(:,:,kk) = Water_GC_even_cell{kk};
+        Fat_GC_even(:,:,kk) = Fat_GC_even_cell{kk};
+        FieldMap_DualGC(:,:,kk) = FieldMap_DualGC_cell{kk};
+        R2_DualGC(:,:,kk) = R2_DualGC_cell{kk};
+    end
+    clear Water_GC_odd_cell Fat_GC_odd_cell Water_GC_even_cell Fat_GC_even_cell FieldMap_DualGC_cell R2_DualGC_cell
 
 else
     for kk = vec_slices
@@ -182,7 +193,7 @@ else
 
         FieldMap_DualGC(:,:,kk) = outParams_GC.fieldmap;
         R2_DualGC(:,:,kk) = outParams_GC.r2starmap;
-        residual(:,:,kk) = outParams_GC.residual;
+        % residual(:,:,:,kk) = outParams_GC.residual;
     end
 end
 
@@ -311,50 +322,64 @@ b(:,:,:,vec_slices) = cat(1, reshape(wf(:,:,vec_slices).*b1(:,:,vec_slices), [1 
 
 if algoParams.parallel
     % Cell allocation
-    b = squeeze(mat2cell(b1, matrix_size(1), matrix_size(2), ones([matrix_size(3),1])));
-    mask = squeeze(mat2cell(mask, matrix_size(1), matrix_size(2), ones([matrix_size(3),1])));
-    wf = squeeze(mat2cell(wf, matrix_size(1), matrix_size(2), ones([matrix_size(3),1])));
-    ff = squeeze(mat2cell(ff, matrix_size(1), matrix_size(2), ones([matrix_size(3),1])));
-    phi_map_init = squeeze(mat2cell(phi_map_init, matrix_size(1), matrix_size(2), ones([matrix_size(3),1])));
-    correction_map_unwrapped = squeeze(mat2cell(zeros(matrix_size(1:3)), matrix_size(1), matrix_size(2), ones([matrix_size(3),1])));
-    correction_map = squeeze(mat2cell(zeros(matrix_size(1:3)), matrix_size(1), matrix_size(2), ones([matrix_size(3),1])));
+    b_cell = cell(nSlices,1);
+    mask_cell = b_cell;
+    wf_cell = b_cell;
+    ff_cell = b_cell;
+    phi_map_init_cell = b_cell;
+    correction_map_unwrapped_cell = b_cell;
+    correction_map_cell = b_cell;
+    for kk = vec_slices
+        b_cell{kk} = b(:,:,:,kk);
+        mask_cell{kk} = mask(:,:,kk);
+        wf_cell{kk} = wf(:,:,kk);
+        ff_cell{kk} = ff(:,:,kk);
+        phi_map_init_cell{kk} = phi_map_init(:,:,kk);
+        correction_map_unwrapped_cell{kk} = correction_map_unwrapped(:,:,kk);
+        correction_map_cell{kk} = correction_map(:,:,kk);
+    end
 
     parfor kk = vec_slices
         % Initialize/clear solution array
-        solution_reg_real = zeros([2 matrix_size(1:2)]);
+        solution_reg_real = zeros([2 matrix_size(1:2)]); % 2 x nx x ny preallocation
         solution_reg_imag = solution_reg_real;
 
         for xx = 1:matrix_size(1)
             for yy = 1:matrix_size(2)
-                if mask{kk} == 1
+                if mask_cell{kk}(xx,yy) == 1
     
-                    A = [1i*wf{kk},wf{kk};1i*ff{kk},ff{kk}];
+                    A = [1i*wf_cell{kk}(xx,yy),wf_cell{kk}(xx,yy);1i*ff_cell{kk}(xx,yy),ff_cell{kk}(xx,yy)];
     
                     A_tik = ctranspose(A)*A + tik_reg*eye(2);
-                    b_tik = ctranspose(A) * b{kk};
+                    b_tik = ctranspose(A) * b_cell{kk}(:,xx,yy);
     
                     if tik_reg == 0
-                        solution_reg_real = lsqminnorm(real(A),real(b{kk}));
-                        solution_reg_imag = lsqlin(imag(A),imag(b{kk}),[],[],[],[],[-pi;-pi],[pi;pi],[phi_map_init{kk};0],options);
+                        solution_reg_real(:,xx,yy) = lsqminnorm(real(A),real(b_cell{kk}(:,xx,yy)));
+                        solution_reg_imag(:,xx,yy) = lsqlin(imag(A),imag(b_cell{kk}(:,xx,yy)),[],[],[],[],[-pi;-pi],[pi;pi],[phi_map_init_cell{kk}(xx,yy);0],options);
                     else
-                        solution_reg_real = lsqminnorm(real(A_tik),real(b_tik));
-                        solution_reg_imag = lsqlin(imag(A_tik),imag(b_tik),[],[],[],[],[-pi;-pi],[pi;pi],[phi_map_init{kk};0],options);
+                        solution_reg_real(:,xx,yy) = lsqminnorm(real(A_tik),real(b_tik));
+                        solution_reg_imag(:,xx,yy) = lsqlin(imag(A_tik),imag(b_tik),[],[],[],[],[-pi;-pi],[pi;pi],[phi_map_init_cell{kk}(xx,yy);0],options);
                     end
                 end
             end
         end
 
-        correction_map_unwrapped{kk} = squeeze(1i.*solution_reg_imag(1,:,:) + solution_reg_real(2,:,:));
+        correction_map_unwrapped_cell{kk} = squeeze(1i.*solution_reg_imag(1,:,:) + solution_reg_real(2,:,:));
 
         % Apply artificial wrap
         solution_reg_imag2 = squeeze(solution_reg_imag(1,:,:));
         solution_reg_imag2(solution_reg_imag2>pi/2) = solution_reg_imag2(solution_reg_imag2>pi/2) - pi;
         solution_reg_imag2(solution_reg_imag2<-pi/2) = solution_reg_imag2(solution_reg_imag2<-pi/2) + pi;
-        correction_map{kk} = 1i.*solution_reg_imag2 + squeeze(solution_reg_real(2,:,:));
+        correction_map_cell{kk} = 1i.*solution_reg_imag2 + squeeze(solution_reg_real(2,:,:));
+    end
+       
+    % Extract from cell array
+    for kk = vec_slices
+        correction_map_unwrapped(:,:,kk) = correction_map_unwrapped_cell{kk};
+        correction_map(:,:,kk) = correction_map_cell{kk};
     end
 
-    correction_map_unwrapped = cell2mat(reshape(correction_map_unwrapped,[1 1 matrix_size(3)]));
-    correction_map = cell2mat(reshape(correction_map,[1 1 matrix_size(3)]));
+    clear b_cell mask_cell wf_cell ff_cell phi_map_init_cell correction_map_unwrapped_cell correction_map_cell
 
 else
     for kk = vec_slices
@@ -777,10 +802,17 @@ if algoParams.parallel
     end
 
     % Extract from cell arrays
-    Water_bipolar = cell2mat(reshape(Water_bipolar,[1 1 matrix_size(3)]));
-    Fat_bipolar = cell2mat(reshape(Fat_bipolar,[1 1 matrix_size(3)]));
-    FieldMap_bipolar = cell2mat(reshape(FieldMap_bipolar,[1 1 matrix_size(3)]));
-    R2_bipolar = cell2mat(reshape(R2_bipolar,[1 1 matrix_size(3)]));
+    Water_bipolar_cell = Water_bipolar; Water_bipolar = zeros(matrix_size);
+    Fat_bipolar_cell = Fat_bipolar; Fat_bipolar = Water_bipolar;
+    FieldMap_bipolar_cell = FieldMap_bipolar; FieldMap_bipolar = Water_bipolar;
+    R2_bipolar_cell = R2_bipolar; R2_bipolar = Water_bipolar;
+    for kk = vec_slices
+        Water_bipolar(:,:,kk) = Water_bipolar_cell{kk};
+        Fat_bipolar(:,:,kk) = Fat_bipolar_cell{kk};
+        FieldMap_bipolar(:,:,kk) = FieldMap_bipolar_cell{kk};
+        R2_bipolar(:,:,kk) = R2_bipolar_cell{kk};
+    end
+    clear Water_bipolar_cell Fat_bipolar_cell FieldMap_bipolar_cell R2_bipolar_cell
 
 else
     for kk = vec_slices
@@ -915,7 +947,7 @@ outParams.FieldMap_DualGC = FieldMap_DualGC;
 outParams.R2_DualGC = R2_DualGC;
 % Preserve prior behavior: keep the residual of the last processed slice
 % (outParams_GC no longer survives the parfor loop above).
-outParams.residual = residuals{vec_slices(end)};
+% outParams.residual = residuals{vec_slices(end)};
 end
 
 % Update display percentage

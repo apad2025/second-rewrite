@@ -62,7 +62,7 @@ function D = perform(D, flags)
             dataParams.images = images;
             dataParams.mask_fwseparation = 1;
 
-            outParams = Function_Bipolar_GC(dataParams, algoParams, 12:16, verboseFLAG);
+            outParams = Function_Bipolar_GC(dataParams, algoParams, 12:13, verboseFLAG);
             
             % save residual if outParams contains it
             % if isfield(outParams, "residual")
