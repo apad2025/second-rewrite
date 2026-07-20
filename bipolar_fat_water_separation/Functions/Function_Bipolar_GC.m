@@ -159,7 +159,7 @@ if algoParams.parallel
     end
 
     % Extract from cell arrays
-    Water_GC_odd_cell = Water_GC_odd; Water_GC_odd = zeros(matrix_size);
+    Water_GC_odd_cell = Water_GC_odd; Water_GC_odd = zeros(matrix_size(1:3));
     Fat_GC_odd_cell = Fat_GC_odd; Fat_GC_odd = Water_GC_odd;
     Water_GC_even_cell = Water_GC_even; Water_GC_even = Water_GC_odd;
     Fat_GC_even_cell = Fat_GC_even; Fat_GC_even = Water_GC_odd;
@@ -802,7 +802,7 @@ if algoParams.parallel
     end
 
     % Extract from cell arrays
-    Water_bipolar_cell = Water_bipolar; Water_bipolar = zeros(matrix_size);
+    Water_bipolar_cell = Water_bipolar; Water_bipolar = zeros(matrix_size(1:3));
     Fat_bipolar_cell = Fat_bipolar; Fat_bipolar = Water_bipolar;
     FieldMap_bipolar_cell = FieldMap_bipolar; FieldMap_bipolar = Water_bipolar;
     R2_bipolar_cell = R2_bipolar; R2_bipolar = Water_bipolar;
