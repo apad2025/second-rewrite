@@ -36,7 +36,7 @@ end
 % fat-water separation
 imDataParams.deltaF = [0; algoParams.gyro*(algoParams.species(2).frequency(:) - algoParams.species(1).frequency(1))*(imDataParams.FieldStrength)];
 
-%% Signal for the acquistion with bipolar gradients and without any correction
+%% Signal for the acquisition with bipolar gradients and without any correction
 
 % If PrecessionIsClockwise=1 the data is loaded without any modification.
 % If PrecessionIsClockwise=-1 data is changed to follow a consistent
@@ -124,9 +124,7 @@ if algoParams.parallel
         c.JobStorageLocation = storage;
     end
     c.NumWorkers = max(c.NumWorkers, nWorkers);
-    parpool(c, nWorkers);
-
-    fprintf("Number of workers is set to: %i", nWorkers);
+    parpool("Threads", 5);
 end
 
 %% Graph-cut fat-water separation for odd and even echoes
@@ -247,8 +245,8 @@ ff = zeros(size(c_ff));
 wf = ff;
 
 % Set SNR threshold
-mag = squeeze(sqrt(sum(input_signal_bipolar_RO.^2, 5)));
-mask_mag = mag > 0.1;
+mag = squeeze(sqrt(sum(abs(input_signal_bipolar_RO).^2, 5)));
+mask_mag = mag > 0.1*max(mag(:));
 snr_thresh = prctile(mag(mask_mag),25);
 
 for kk = vec_slices
@@ -260,7 +258,7 @@ for kk = vec_slices
                 wf(xx,yy,kk) = c_wf(xx,yy,kk);
             else
                 % Binary assignment
-                if mag(xx,yy,kk) >= algoParams.weight
+                if c_ff(xx,yy,kk) >= algoParams.weight
                     ff(xx,yy,kk) = 1;
                     wf(xx,yy,kk) = 0;
                 else % mag(xx,yy,kk) < algoParams.weight
@@ -275,7 +273,7 @@ end
 ff = ff.*mask(:,:,:);
 wf = wf.*mask(:,:,:);
 
-clear c_ff c_wf
+clear c_ff c_wf mag mask_mag
 
 if algoParams.plot_debug
 % Binary mask derived from the initial fat fraction

@@ -11,8 +11,8 @@
 #SBATCH --time=10:00:00
 #SBATCH --nodes=1
 #SBATCH --ntasks=1
-#SBATCH --cpus-per-task=25
-#SBATCH --mem=225G
+#SBATCH --cpus-per-task=6
+#SBATCH --mem=180G
 #SBATCH --output=fwsep_par_%j.out
 #SBATCH --error=fwsep_par_%j.err
 ### ---- EDIT THESE ---------------------------------------------------------
@@ -33,13 +33,7 @@ export MATLAB_PREFDIR="$SCRATCH/mathworks_cache/prefdir"   # preferences dir
 export MATLAB_LOG_DIR="$SCRATCH/mathworks_cache/logs"      # crash/diagnostic logs
 mkdir -p "$MATLAB_PREFDIR" "$MATLAB_LOG_DIR"
 
-# Keep each parfor worker single threaded so NUM workers do not oversubscribe
-# the NUM physical cores.
-export OMP_NUM_THREADS=1
-
 cd "$CODE_DIR"
 echo "Host: $(hostname)  |  Job: $SLURM_JOB_ID  |  Cores: $SLURM_CPUS_PER_TASK  |  Started: $(date)"
-export LD_LIBRARY_PATH="${LD_LIBRARY_PATH:+$LD_LIBRARY_PATH:}${MATLABROOT}/bin/glnxa64"
-"$MATLABROOT/bin/matlab" -c 27000@modulus.tamu.edu:27001@hprc-license.tamu.edu \
-    -nodisplay -nosplash -batch "DogAnalysis"
+matlab -nodisplay -nosplash -batch "DogAnalysis"
 echo "Finished: $(date)"
