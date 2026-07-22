@@ -1,3 +1,9 @@
+# Dependencies
+Clone CREAM_PDFF to the root directory of this repo:
+```bash
+git clone https://github.com/degitz/CREAM_PDFF.git
+```
+
 # Changes
 - If on Windows, manually add each to the MATLAB path
     - GRMD

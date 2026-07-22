@@ -1,6 +1,0 @@
-nbsphinx
-sphinxcontrib-packages
-sphinxcontrib-matlabdomain == 0.19.*
-sphinx-rtd-theme
-numpy
-pyyaml
