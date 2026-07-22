@@ -241,26 +241,41 @@ if algoParams.plot_debug
     title('Initial Fat Map')
 end
 
-%% Binary fat and water mask (after thresholding using a specific values included in structure params)
+%% Fat and water mask (after thresholding using a specific values included in structure params)
 
-% ff = zeros(matrix_size(1:3));
-% 
-% ff (c_ff>=algoParams.weight) = 1;
-% ff (c_ff<algoParams.weight) = 0;
-% 
-% ff = ff.*mask(:,:,:);
-% wf = (1 - ff).*mask(:,:,:);
+ff = zeros(size(c_ff));
+wf = ff;
 
-% option 1
-ff = c_ff.*mask(:,:,:);
-wf = c_wf.*mask(:,:,:); % c_wf == 1 - c_ff, already clamped to [0,1]
+% Set SNR threshold
+mag = squeeze(sqrt(sum(input_signal_bipolar_RO.^2, 5)));
+mask_mag = mag > 0.1;
+snr_thresh = prctile(mag(mask_mag),25);
 
-% option 2
-% soft threshold: sharpness k controls how gradual the transition is
-% k = 10; % larger k means closer to the old binary behavior
-% ff = 1 ./ (1 + exp(-k*(c_ff - algoParams.weight)));
-% ff = ff.*mask(:,:,:);
-% wf = (1 - ff).*mask(:,:,:);
+for kk = vec_slices
+    for xx = 1:matrix_size(1)
+        for yy = 1:matrix_size(2)
+            % Evaluate pixel against SNR threshold
+            if mag(xx,yy,kk) > snr_thresh
+                ff(xx,yy,kk) = c_ff(xx,yy,kk);
+                wf(xx,yy,kk) = c_wf(xx,yy,kk);
+            else
+                % Binary assignment
+                if mag(xx,yy,kk) >= algoParams.weight
+                    ff(xx,yy,kk) = 1;
+                    wf(xx,yy,kk) = 0;
+                else % mag(xx,yy,kk) < algoParams.weight
+                    ff(xx,yy,kk) = 0;
+                    wf(xx,yy,kk) = 1;
+                end
+            end
+        end
+    end
+end
+
+ff = ff.*mask(:,:,:);
+wf = wf.*mask(:,:,:);
+
+clear c_ff c_wf
 
 if algoParams.plot_debug
 % Binary mask derived from the initial fat fraction
@@ -832,7 +847,7 @@ end
 
 if VERBOSE
     tttime = toc;
-    fprintf('. Done (%.2f sec)', tttime)
+    fprintf('. Done (%.2f sec)\n', tttime)
 end
 
 %% Figure to check the results
