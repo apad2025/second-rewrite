@@ -42,6 +42,18 @@ saveFLAG = true;
 cscFLAG = true; % chemical shift correction instead of unwrap + echo combination
 debugFLAG = false;
 
+% Select processing stage, set through the CSC_STAGE environment variable so
+% that the same script serves both the serial run and the SLURM array job
+%       'all' - preprocess, correct every slice, then continue to the field maps
+%      'prep' - preprocess only, and cache the volume-wide SNR threshold
+%     'slice' - correct the single slice given by SLURM_ARRAY_TASK_ID
+%   'combine' - stack the per-slice saves into the full corrected dataset
+stage = getenv('CSC_STAGE');
+if isempty(stage), stage = 'all'; end
+if ~any(strcmp(stage, {'all','prep','slice','combine'}))
+    error('Unrecognized processing stage ''%s''.', stage)
+end
+
 % Remove subsampling if not graph-cuts
 if ~strcmp(flags.unwrapping.method, 'GraphCuts'), flags.unwrapping = rmfield(flags.unwrapping, 'subsample'); end
 
@@ -267,6 +279,24 @@ if ppFLAG
     D_raw = Operations.Save(D, saveFLAG, pth_1H, snames.Preprocessed, flags.verbose);
 end
 
+%% Slice-wise processing
+% Location of the per-slice saves & of the threshold they have to share
+pth_slices = fullfile(pth_1H, [snames.CorrectedCS, '_slices']);
+fl_snr = fullfile(pth_slices, 'SNRThreshold.mat');
+
+if strcmp(stage, 'prep')
+    if ~isfolder(pth_slices), mkdir(pth_slices); end
+
+    % Cache the volume-wide SNR threshold, which every slice must share
+    snr_thresh = CSC.snrThreshold(D_raw, flags);
+    save(fl_snr, 'snr_thresh');
+
+    if flags.verbose; fprintf('\nPreprocessing complete (SNR threshold: %g)\n', snr_thresh); end
+    return
+elseif ~strcmp(stage, 'all') && ~isfile(fl_snr)
+    error('No SNR threshold found in %s. Run DogAnalysis with CSC_STAGE=prep first.', pth_slices)
+end
+
 % Plot data
 if flags.plot
     plotmygraph(D_raw.Data.WeightedMagnitude, 'PlotTitle', ['D' num2str(dog) 'D' num2str(date) ' Magnitude'], 'DataRange', plrange);
@@ -377,8 +407,31 @@ if ~D.Flags.CorrectedChemicalShift && cscFLAG
     end
     
     % Perform chemical shift correction
-    delete(gcp('nocreate'))
-    D = CSC.perform(D, flags);
+    switch stage
+        case 'slice'
+            % Correct a single slice & save it for later assembly
+            sl = str2double(getenv('SLURM_ARRAY_TASK_ID'));
+            if isnan(sl)
+                error('SLURM_ARRAY_TASK_ID is not set. Slice-wise correction needs a slice index.')
+            end
+
+            load(fl_snr, 'snr_thresh')
+            [D, Data] = CSC.performSlice(D, flags, sl, snr_thresh);
+
+            TE = D.TE;
+            save(fullfile(pth_slices, sprintf('%s_%03i.mat', snames.CorrectedCS, sl)), 'Data', 'TE', '-v7.3');
+
+            if flags.verbose; fprintf('\nSaved slice %i of %i\n', sl, D.Size(3)); end
+            return
+
+        case 'combine'
+            % Stack the per-slice saves back into the full dataset
+            D = CSC.assemble(D, pth_slices, snames.CorrectedCS, flags.verbose);
+
+        otherwise
+            delete(gcp('nocreate'))
+            D = CSC.perform(D, flags);
+    end
 
     % % Calculate fat frequency shift
     % dfat = -3.5*D.F0;
@@ -588,6 +641,10 @@ if ppFLAG
     % if isfield(D.Data, 'Image'), D.Data = rmfield(D.Data, 'Image'); end
     D_cscorr = Operations.Save(D, saveFLAG, pth_1H, snames.CorrectedCS, flags.verbose);
 end
+
+% Slice-wise runs stop here: background field removal & dipole inversion are 3D
+% processes, and are run separately from the assembled dataset
+if ~strcmp(stage, 'all'); return; end
 
 % No need for relaxation & flip angle correction: https://doi.org/10.1002/mrm.21301
 %   Since flip angle is small (8 deg) & TR is long (616msec), T1 & flip angle effects can be ignored

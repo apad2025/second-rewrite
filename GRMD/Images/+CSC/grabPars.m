@@ -54,11 +54,6 @@ function algoParams = grabPars(flags)
             algoParams.tik_reg               = 0;               % Tikhonov regularization binary flag
             algoParams.plot_debug            = false;
             algoParams.parallel              = true;
-            
-            if exist("/scratch/user/apad/residuals/checkpoint.mat", "file")
-                load("/scratch/user/apad/residuals/checkpoint.mat");
-                algoParams.residual = residual;
-            end
 
         case 'vlGC'
             % Algorithm-specific parameters

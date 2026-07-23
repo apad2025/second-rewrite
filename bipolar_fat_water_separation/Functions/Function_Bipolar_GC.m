@@ -52,8 +52,8 @@ input_signal_bipolar_RO = imDataParams.images;
 %% Matrix size and number of voxels
 
 matrix_size = size(input_signal_bipolar_RO);
-numvox = prod(matrix_size(1:3));
 nSlices = numel(vec_slices);
+numvox = prod([matrix_size(1:2) nSlices]); % only the slices in vec_slices are corrected
 
 %% Number of echoes
 
@@ -106,7 +106,7 @@ if algoParams.parallel
 
     delete(gcp('nocreate'));
     c = parcluster('local');
-    
+
     % fix queue issue
     jobid = getenv('SLURM_JOB_ID');
     if ~isempty(jobid)
@@ -241,8 +241,14 @@ wf = ff;
 
 % Set SNR threshold
 mag = squeeze(sqrt(sum(abs(input_signal_bipolar_RO).^2, 5)));
-mask_mag = mag > 0.1*max(mag(:));
-snr_thresh = prctile(mag(mask_mag),25);
+if isfield(algoParams, 'snr_thresh')
+    % Threshold supplied by the caller, so that slices corrected in separate
+    % jobs all share the same volume-wide value
+    snr_thresh = algoParams.snr_thresh;
+else
+    mask_mag = mag > 0.1*max(mag(:));
+    snr_thresh = prctile(mag(mask_mag),25);
+end
 
 for kk = vec_slices
     for xx = 1:matrix_size(1)
@@ -405,7 +411,7 @@ else
         solution_reg_imag = solution_reg_real;
 
         for xx = 1:matrix_size(1)
-            if VERBOSE 
+            if VERBOSE
                 perc = perc + 1;
                 reverseStr = UpdatePercent(perc/maxPerc*100, reverseStr);
             end
@@ -775,13 +781,13 @@ end
 
 %% Deconvolving the effect of the errors introduce by the readout
 
-s0 = permute(input_signal_bipolar_RO, [length(matrix_size) 1:length(matrix_size)-1]);
+s0 = permute(input_signal_bipolar_RO(:,:,vec_slices,:,:), [length(matrix_size) 1:length(matrix_size)-1]);
 s0 = reshape(s0,[numte numvox]);
 
 counter_t = reshape(1:numte,[numte 1]);
 counter_t = repmat(counter_t,[1 numvox]);
 
-total_correction_reshaped = reshape(total_correction,[1 numvox]);
+total_correction_reshaped = reshape(total_correction(:,:,vec_slices),[1 numvox]);
 
 E = repmat(total_correction_reshaped,[numte 1]) .^ ((-1).^(counter_t));
 
@@ -789,7 +795,8 @@ corrected_signal = s0 ./ (E);
 
 corrected_signal = permute(corrected_signal,[2 1]);
 
-corrected_bipolar_signal = reshape(corrected_signal,matrix_size(1),matrix_size(2),matrix_size(3),1,numte);
+corrected_bipolar_signal = zeros([matrix_size(1:3) 1 numte], 'like', input_signal_bipolar_RO);
+corrected_bipolar_signal(:,:,vec_slices,:,:) = reshape(corrected_signal,matrix_size(1),matrix_size(2),nSlices,1,numte);
 
 outParams.bipolar_error_map_theta = phi_map - 1i*eps_map;
 
