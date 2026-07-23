@@ -101,16 +101,9 @@ R2_bipolar = Water_GC_odd;
 
 %% Parallel pool sized to the SLURM allocation
 if algoParams.parallel
-    % Falls back to local core count if not sized to SLURM core count
-    if isfield(algoParams, 'nWorkers')
-        nWorkers = algoParams.nWorkers;
-    else
-        nWorkers = str2double(getenv('SLURM_CPUS_PER_TASK'));
-        if isnan(nWorkers) || nWorkers < 1
-            nWorkers = maxNumCompThreads;
-        end
-        nWorkers = max(1, min(nWorkers, numel(vec_slices)));
-    end
+    % Use one fewer worker than allocated cores in SLURM script
+    nWorkers = 25;
+
     delete(gcp('nocreate'));
     c = parcluster('local');
     
@@ -124,7 +117,9 @@ if algoParams.parallel
         c.JobStorageLocation = storage;
     end
     c.NumWorkers = max(c.NumWorkers, nWorkers);
-    parpool("Threads", 5);
+    % Must be process pool because graph-cut solver calls max_flow MEX
+    % which is unsupported by threads
+    parpool(c, nWorkers);
 end
 
 %% Graph-cut fat-water separation for odd and even echoes
@@ -261,7 +256,7 @@ for kk = vec_slices
                 if c_ff(xx,yy,kk) >= algoParams.weight
                     ff(xx,yy,kk) = 1;
                     wf(xx,yy,kk) = 0;
-                else % mag(xx,yy,kk) < algoParams.weight
+                else % c_ff(xx,yy,kk) < algoParams.weight
                     ff(xx,yy,kk) = 0;
                     wf(xx,yy,kk) = 1;
                 end
@@ -333,6 +328,10 @@ b1(:,:,vec_slices) = 0.5.*(log(Water_GC_even(:,:,vec_slices)) - log(Water_GC_odd
 b2(:,:,vec_slices) = 0.5.*(log(Fat_GC_even(:,:,vec_slices)) - log(Fat_GC_odd(:,:,vec_slices)));
 b(:,:,:,vec_slices) = cat(1, reshape(wf(:,:,vec_slices).*b1(:,:,vec_slices), [1 size(wf(:,:,vec_slices))]), reshape(ff(:,:,vec_slices).*b2(:,:,vec_slices), [1 size(wf(:,:,vec_slices))]));
 
+if VERBOSE
+    tic
+end
+
 if algoParams.parallel
     % Cell allocation
     b_cell = cell(nSlices,1);
@@ -395,6 +394,11 @@ if algoParams.parallel
     clear b_cell mask_cell wf_cell ff_cell phi_map_init_cell correction_map_unwrapped_cell correction_map_cell
 
 else
+    % Initialize progress display
+    perc = 0;
+    maxPerc = nSlices*matrix_size(1);
+    reverseStr = '';
+
     for kk = vec_slices
         % Initialize/clear solution array
         solution_reg_real = zeros([2 matrix_size(1:2)]);
