@@ -419,23 +419,23 @@ else
                     b_tik = ctranspose(A) * b(:,xx,yy,kk);
 
                     if tik_reg == 0
-                        solution_reg_real(:,xx,yy,kk) = lsqminnorm(real(A),real(b(:,xx,yy,kk)));
-                        solution_reg_imag(:,xx,yy,kk) = lsqlin(imag(A),imag(b(:,xx,yy,kk)),[],[],[],[],[-pi;-pi],[pi;pi],[phi_map_init(xx,yy,kk);0],options);
+                        solution_reg_real(:,xx,yy) = lsqminnorm(real(A),real(b(:,xx,yy,kk)));
+                        solution_reg_imag(:,xx,yy) = lsqlin(imag(A),imag(b(:,xx,yy,kk)),[],[],[],[],[-pi;-pi],[pi;pi],[phi_map_init(xx,yy,kk);0],options);
                     else
-                        solution_reg_real(:,xx,yy,kk) = lsqminnorm(real(A_tik),real(b_tik));
-                        solution_reg_imag(:,xx,yy,kk) = lsqlin(imag(A_tik),imag(b_tik),[],[],[],[],[-pi;-pi],[pi;pi],[phi_map_init(xx,yy,kk);0],options);
+                        solution_reg_real(:,xx,yy) = lsqminnorm(real(A_tik),real(b_tik));
+                        solution_reg_imag(:,xx,yy) = lsqlin(imag(A_tik),imag(b_tik),[],[],[],[],[-pi;-pi],[pi;pi],[phi_map_init(xx,yy,kk);0],options);
                     end
                 end
             end
         end
 
-        correction_map_unwrapped(:,:,kk) = squeeze(1i.*solution_reg_imag(1,:,:,kk) + solution_reg_real(2,:,:,kk));
+        correction_map_unwrapped(:,:,kk) = squeeze(1i.*solution_reg_imag(1,:,:) + solution_reg_real(2,:,:));
 
         % Apply artificial wrap
-        solution_reg_imag2 = squeeze(solution_reg_imag(1,:,:,kk));
+        solution_reg_imag2 = squeeze(solution_reg_imag(1,:,:));
         solution_reg_imag2(solution_reg_imag2>pi/2) = solution_reg_imag2(solution_reg_imag2>pi/2) - pi;
         solution_reg_imag2(solution_reg_imag2<-pi/2) = solution_reg_imag2(solution_reg_imag2<-pi/2) + pi;
-        correction_map(:,:,kk) = 1i.*solution_reg_imag2 + squeeze(solution_reg_real(2,:,:,kk));
+        correction_map(:,:,kk) = 1i.*solution_reg_imag2 + squeeze(solution_reg_real(2,:,:));
     end
 end
 
