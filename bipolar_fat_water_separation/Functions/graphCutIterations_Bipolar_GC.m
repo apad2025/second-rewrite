@@ -81,6 +81,7 @@ clear cur_ind2
 
 % Main graph-cut loop. At each iteration, a max-flow/min-cut problem is solved
 fm = zeros(sx,sy);
+fmiters = zeros(sx,sy,algoParams.NUM_ITERS);
 for kg = 1:algoParams.NUM_ITERS
 
     fmiters(:,:,kg) = fm;
@@ -203,17 +204,17 @@ for kg = 1:algoParams.NUM_ITERS
     cur_ind(cur_ind>length(fms)) = length(fms);
 
     fm = fms(cur_ind);
+    fprintf('%i, %f\n', kg, norm(fm-fmiters(:,:,kg)))
 
     index_fm = cur_ind;
 
     if plot_debug
         % If we want to see the fieldmap at each step
         figure(100)
-        subplot(1,2,1)
         imagesc(fm)
         axis image
         axis off
-        clim(algoParams.range_fm)
+        % clim(algoParams.range_fm)
         title(['Iteration: ' num2str(kg)],'FontSize',12);
         colormap gray
         colorbar

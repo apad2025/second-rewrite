@@ -226,18 +226,6 @@ if VERBOSE
     fprintf('Done (%.2f sec)', tttime)
 end
 
-if algoParams.plot_debug
-    figure(100)
-    subplot(1,2,2)
-    imagesc(fm(:,:))
-    axis image
-    axis off
-    clim(algoParams.range_fm)
-    title('Final B_0 map','Interpreter','tex');
-    colormap('gray')
-    colorbar
-end
-
 % If we have subsampled (for speed), let's interpolate the field map
 if SUBSAMPLE > 1
     fmlowres = fm;

@@ -441,7 +441,7 @@ end
 
 if VERBOSE
     tttime = toc;
-    fprintf('Done (%.2f sec)', tttime)
+    fprintf('Done (%.2f sec)\n', tttime)
 end
 
 % Compute residual for all voxels and all field values
