@@ -204,7 +204,6 @@ for kg = 1:algoParams.NUM_ITERS
     cur_ind(cur_ind>length(fms)) = length(fms);
 
     fm = fms(cur_ind);
-    fprintf('%i, %f\n', kg, norm(fm-fmiters(:,:,kg)))
 
     index_fm = cur_ind;
 

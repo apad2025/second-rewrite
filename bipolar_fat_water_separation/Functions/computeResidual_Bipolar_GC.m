@@ -148,7 +148,7 @@ for ka = 1:num_acq
         temp3 = squeeze(sum(reshape(temp2,[C NUM_FMS*sx numel(r2s)]),1));
         [mint3,imint3] = min(temp3,[],2);
 
-        residual(:,:,ky) = squeeze(residual(:,:,ky)).' + reshape(mint3,[sx NUM_FMS]).';
+        residual(:,:,ky) = residual(:,:,ky) + reshape(mint3,[sx NUM_FMS]).';
     end
 end
 if VERBOSE
