@@ -59,6 +59,10 @@ if nargin < 6
     DEBUG = 0;
 end
 
+if isfield(algoParams, 'seed')
+    rng(algoParams.seed)
+end
+
 % Initialize some auxiliary variables
 plot_debug = algoParams.plot_debug;
 SMOOTH_NOSIGNAL = algoParams.SMOOTH_NOSIGNAL;
