@@ -131,22 +131,22 @@ if ~isfield(algoParams, 'STARTBIG')
     algoParams2.STARTBIG = true;
 end
 
-%%   - algoParams.MAX_ITERS = 40; % Maximum number of graph cut iterations
+%%   - algoParams.MAX_ITERS = 200; % Maximum number of graph cut iterations
 if ~isfield(algoParams, 'MAX_ITERS')
     algoParams2.MAX_ITERS = 200;
 end
 
-%%   - algoParams.MIN_ITERS = dkg + 5; % Minimum number of graph cut iterations before convergence can begin
+%%   - algoParams.MIN_ITERS = NUM_ITERS; % Minimum number of graph cut iterations before convergence can begin
 if ~isfield(algoParams, 'MIN_ITERS')
     algoParams2.MIN_ITERS = 40;
 end
 
-%%   - algoParams.convTol = 40; % Relative energy-improvement tolerance
+%%   - algoParams.convTol = 5e-4; % Relative energy-improvement tolerance
 if ~isfield(algoParams, 'convTol')
     algoParams2.convTol = 5e-4;
 end
 
-%%   - algoParams.MIN_ITERS = 40; % Maximum number of stalled graph cut iterations before convergence
+%%   - algoParams.MAX_STALLEDITERS = 5; % Maximum number of stalled graph cut iterations before convergence
 if ~isfield(algoParams, 'MAX_STALLEDITERS')
     algoParams2.MAX_STALLEDITERS = 5;
 end
