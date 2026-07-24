@@ -74,6 +74,11 @@ if ~isfield(algoParams, 'DO_OT')
     algoParams2.DO_OT = 0;
 end
 
+%%   - algoParams.OTconvTol = 1e-4; % Relative gradient norm tolerance in optimization transfer loop
+if ~isfield(algoParams, 'OTconvTol')
+    algoParams2.OTconvTol = 1e-4;
+end
+
 %%   - algoParams.LMAP_POWER = 2; % Spatially-varying regularization (2 gives ~ uniformn resolution)
 if ~isfield(algoParams, 'LMAP_POWER')
     algoParams2.LMAP_POWER = 2; 
@@ -141,9 +146,9 @@ if ~isfield(algoParams, 'MIN_ITERS')
     algoParams2.MIN_ITERS = 40;
 end
 
-%%   - algoParams.convTol = 5e-4; % Relative energy-improvement tolerance
-if ~isfield(algoParams, 'convTol')
-    algoParams2.convTol = 5e-4;
+%%   - algoParams.GCconvTol = 7e-4; % Relative energy-improvement tolerance in graph-cut loop
+if ~isfield(algoParams, 'GCconvTol')
+    algoParams2.GCconvTol = 7e-4;
 end
 
 %%   - algoParams.MAX_STALLEDITERS = 5; % Maximum number of stalled graph cut iterations before convergence
