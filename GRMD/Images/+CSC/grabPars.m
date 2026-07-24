@@ -21,7 +21,7 @@ function algoParams = grabPars(flags)
             algoParams.NUM_R2STARS           = 101;             % Number of R2* values for quantization (default = 11)
             algoParams.range_fm              = [-500 500];      % Range of field map values
             algoParams.NUM_FMS               = 1001;            % Number of field map values to discretize (default = 300)
-            algoParams.NUM_ITERS             = 40;              % Number of graph cut iterations
+            algoParams.MAX_ITERS             = 40;              % Number of graph cut iterations
             algoParams.SUBSAMPLE             = flags.subsample; % Spatial subsampling for field map estimation (for speed)
             algoParams.DO_OT                 = 1;               % 0,1 flag to enable optimization transfer descent (final stage of field map estimation)
             algoParams.LMAP_POWER            = 2;               % Spatially-varying regularization (2 gives ~ uniformn resolution)
@@ -39,21 +39,27 @@ function algoParams = grabPars(flags)
             algoParams.species = struct('name', {'water', 'fat'}, ...
                                    'frequency', {0, [-3.8,  -3.4,  -2.6,  -1.94, -0.39,  0.6]}, ...
                                      'relAmps', {1, [ 0.087, 0.693, 0.128, 0.004, 0.039, 0.048]});
-            algoParams.size_clique           = 1;               % Size of MRF neighborhood (1 uses an 8-neighborhood, common in 2D)
-            algoParams.range_r2star          = [0 300];         % Range of R2* values
-            algoParams.NUM_R2STARS           = 101;             % Number of R2* values for quantization (default = 11)
-            algoParams.range_fm              = [-500 500];      % Range of field map values
-            algoParams.NUM_FMS               = 1001;            % Number of field map values to discretize (default = 300)
-            algoParams.NUM_ITERS             = 120;             % Number of graph cut iterations
-            algoParams.SUBSAMPLE             = flags.subsample; % Spatial subsampling for field map estimation (for speed)
-            algoParams.DO_OT                 = 0;               % 0,1 flag to enable optimization transfer descent (final stage of field map estimation)
-            algoParams.LMAP_POWER            = 2;               % Spatially-varying regularization (2 gives ~ uniformn resolution)
-            algoParams.lambda                = 0.10;            % Regularization parameter
-            algoParams.LMAP_EXTRA            = 0.2;             % Settle on 0.2 for smoothing
-            algoParams.TRY_PERIODIC_RESIDUAL = 0;               % Take advantage of periodic residual if uniform TEs (will change range_fm)  
-            algoParams.tik_reg               = 0;               % Tikhonov regularization binary flag
+            algoParams.size_clique           = 1;                           % Size of MRF neighborhood (1 uses an 8-neighborhood, common in 2D)
+            algoParams.range_r2star          = [0 300];                     % Range of R2* values
+            algoParams.NUM_R2STARS           = 101;                         % Number of R2* values for quantization (default = 11)
+            algoParams.range_fm              = [-500 500];                  % Range of field map values
+            algoParams.NUM_FMS               = diff(algoParams.range_fm)+1; % Number of field map values to discretize (default = 300)
+            algoParams.MIN_ITERS             = 40;                          % Minimum number of graph cut iterations
+            algoParams.MAX_ITERS             = 300;                         % Maximum number of graph cut iterations
+            algoParams.MAX_STALLEDITERS      = 10;                          % Maximum number of stalled iterations before convergence
+            algoParams.MAX_STALLEDITERS_GC   = 5;                           % Maximum number of stalled iterations before convergence in Bipolar_GC
+            algoParams.GCconvTol             = 5e-4;                        % Relative energy-improvement tolerance
+            algoParams.OTconvTol             = 2e-2;                        % Relative gradient norm tolerance
+            algoParams.SUBSAMPLE             = flags.subsample;             % Spatial subsampling for field map estimation (for speed)
+            algoParams.LMAP_POWER            = 2;                           % Spatially-varying regularization (2 gives ~ uniformn resolution)
+            algoParams.lambda                = 0.10;                        % Regularization parameter for graph-cut 
+            algoParams.LMAP_EXTRA            = 0.15;                        % Additional regularization for low-signal regions
+            algoParams.TRY_PERIODIC_RESIDUAL = 1;                           % Take advantage of periodic residual if uniform TEs (will change range_fm)  
+            algoParams.DO_OT                 = 1;                           % 0,1 flag to enable optimization transfer descent (final stage of field map estimation)
+            algoParams.tik_reg               = 0;                           % Tikhonov regularization binary flag
             algoParams.plot_debug            = false;
-            algoParams.parallel              = true;
+            algoParams.parallel              = false;
+            algoParams.seed                  = 0;                           % rng seed. If none is present, seed will not be set
 
         case 'vlGC'
             % Algorithm-specific parameters
