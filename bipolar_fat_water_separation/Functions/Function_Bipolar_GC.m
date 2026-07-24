@@ -74,6 +74,10 @@ if isscalar(mask) && mask==1
     imDataParams.mask_fwseparation = mask;
 end
 
+%%% Set MAX_STALLEDITERS
+MAX_STALLEDITERS_GC = algoParams.MAX_STALLEDITERS_GC;
+MAX_STALLEDITERS = algoParams.MAX_STALLEDITERS;
+
 %% Memory allocation
 
 % Field maps and R2 star maps
@@ -124,6 +128,9 @@ if algoParams.parallel
 end
 
 %% Fat-water separation for odd and even echoes
+% Temporarily set MAX_STALLEDITERS
+algoParams.MAX_STALLEDITERS = MAX_STALLEDITERS_GC;
+
 if VERBOSE
     fprintf('\nFat-water separation for odd and even echo datasets slice ');
 end
@@ -191,11 +198,14 @@ else
     end
 end
 
+% Reset MAX_STALLEDITERS
+algoParams.MAX_STALLEDITERS = MAX_STALLEDITERS;
+
 %% Fat and water fraction masks generation
 
 slice_image = algoParams.slice_image;
 
-[c_ff, c_wf] = Function_Fat_Quantification_Bipolar_GC( Fat_GC_odd, Water_GC_odd);
+[c_ff, c_wf] = Function_Fat_Quantification_Bipolar_GC(Fat_GC_odd, Water_GC_odd);
 
 c_ff = c_ff.*mask(:,:,:);
 c_ff(c_ff>=1) = 1;
@@ -239,29 +249,33 @@ end
 ff = zeros(size(c_ff));
 wf = ff;
 
-% Set SNR threshold
-mag = squeeze(sqrt(sum(abs(input_signal_bipolar_RO).^2, 5)));
+% Generate simple SNR mask
+mag = squeeze(sqrt(sum(abs(input_signal_bipolar_RO).^2, [4 5])));
 if isfield(algoParams, 'snr_thresh')
     % Threshold supplied by the caller, so that slices corrected in separate
     % jobs all share the same volume-wide value
     snr_thresh = algoParams.snr_thresh;
 else
-    mask_mag = mag > 0.1*max(mag(:));
-    snr_thresh = prctile(mag(mask_mag),25);
+    mask_SNR = mask & mag>0.1*max(mag(:));
+    snr_thresh = prctile(mag(mask_SNR),25);
 end
 
-% Evaluate pixel against SNR threshold
-ff(mag>snr_thresh) = c_ff(mag>snr_thresh);
-wf(mag>snr_thresh) = c_wf(mag>snr_thresh);
+ff_DualGC = abs(Fat_GC_odd)./(abs(Water_GC_odd) + abs(Fat_GC_odd));
+wf_DualGC = abs(Water_GC_odd)./(abs(Water_GC_odd) + abs(Fat_GC_odd));
+thresh = wf_DualGC>0.15 & ff_DualGC>0.15 & mag>snr_thresh;
 
-% Binary assignment for those below threshold
-ff(mag<=snr_thresh & c_ff>=algoParams.weight) = 1;
-wf(mag<=snr_thresh & c_ff<algoParams.weight) = 1;
+% Evaluate pixel against SNR & extreme fraction threshold
+ff(thresh) = c_ff(thresh);
+wf(thresh) = c_wf(thresh);
 
-ff = ff.*mask(:,:,:);
-wf = wf.*mask(:,:,:);
+% Binary assignment for those outside threshold
+ff(~thresh & c_ff>=algoParams.weight) = 1;
+wf(~thresh & c_ff<algoParams.weight) = 1;
 
-clear c_ff c_wf mag mask_mag
+ff = ff.*mask;
+wf = wf.*mask;
+
+clear c_ff c_wf mag mask_SNR ff_DualGC wf_DualGC
 
 if algoParams.plot_debug
 % Binary mask derived from the initial fat fraction
@@ -803,7 +817,7 @@ if algoParams.parallel
     end
 
     parfor kk = vec_slices        
-        outParams_bipolar = fw_i2cm1i_3pluspoint_hernando_graphcut(imDataParams_cell{kk}, algoParams, false);
+        outParams_bipolar = fw_i2cm1i_3pluspoint_hernando_graphcut(imDataParams_cell{kk}, algoParams, VERBOSE);
     
         Water_bipolar{kk} = outParams_bipolar.species(1).amps;
         Fat_bipolar{kk} = outParams_bipolar.species(2).amps;
@@ -831,7 +845,7 @@ else
         end
         imDataParams.images = corrected_bipolar_signal(:,:,kk,:,:); % Originaly size[nx,ny,nz,ncoils,nechoes] Note: This specific order is required for GC algorithm
 
-        outParams_bipolar = fw_i2cm1i_3pluspoint_hernando_graphcut(imDataParams, algoParams, false);
+        outParams_bipolar = fw_i2cm1i_3pluspoint_hernando_graphcut(imDataParams, algoParams, VERBOSE);
 
         Water_bipolar(:,:,kk) = outParams_bipolar.species(1).amps;
         Fat_bipolar(:,:,kk) = outParams_bipolar.species(2).amps;

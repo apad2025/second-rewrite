@@ -21,7 +21,9 @@ function snr_thresh = snrThreshold(D, flags)
     end
 
     % Set SNR threshold
-    mag = squeeze(sqrt(sum(abs(images).^2, 5)));
+    % Note: sum over coils (dim 4) and echoes (dim 5) to match the magnitude
+    % definition in Function_Bipolar_GC's mask generation.
+    mag = squeeze(sqrt(sum(abs(images).^2, [4 5])));
     mask_mag = mag > 0.1*max(mag(:));
     snr_thresh = prctile(mag(mask_mag),25);
 end

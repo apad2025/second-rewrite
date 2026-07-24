@@ -156,6 +156,11 @@ if ~isfield(algoParams, 'MAX_STALLEDITERS')
     algoParams2.MAX_STALLEDITERS = 5;
 end
 
+%%   - algoParams.MAX_STALLEDITERS_GC = algoParams.MAX_STALLEDITERS; % Maximum number of stalled graph cut iterations before convergence in Bipolar_GC
+if ~isfield(algoParams, 'MAX_STALLEDITERS_GC')
+    algoParams2.MAX_STALLEDITERS_GC = algoParams2.MAX_STALLEDITERS;
+end
+
 %% Extra parameters to enable fat-water separation with bipolar readouts
 
 %% - imDataParams.mask_fwseparation (binary mask to perform fat-water separation in voxels within the mask)
