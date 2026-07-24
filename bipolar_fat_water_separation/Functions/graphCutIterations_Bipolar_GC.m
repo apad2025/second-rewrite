@@ -19,27 +19,13 @@
 %      - algoParams.species(2).relAmps = [0.087 0.693 0.128 0.004 0.039 0.048]
 %
 %   - algoParams.size_clique = 1; % Size of MRF neighborhood (1 uses an 8-neighborhood, common in 2D)
-%   - algoParams.range_r2star = [0 0]; % Range of R2* values
-%   - algoParams.NUM_R2STARS = 1; % Numbre of R2* values for quantization
 %   - algoParams.range_fm = [-400 400]; % Range of field map values
 %   - algoParams.NUM_FMS = 301; % Number of field map values to discretize
 %   - algoParams.NUM_ITERS = 40; % Number of graph cut iterations
-%   - algoParams.SUBSAMPLE = 2; % Spatial subsampling for field map estimation (for speed)
-%   - algoParams.DO_OT = 1; % 0,1 flag to enable optimization transfer descent (final stage of field map estimation)
-%   - algoParams.LMAP_POWER = 2; % Spatially-varying regularization (2 gives ~ uniformn resolution)
 %   - algoParams.lambda = 0.05; % Regularization parameter
-%   - algoParams.LMAP_EXTRA = 0.05; % More smoothing for low-signal regions
-%   - algoParams.TRY_PERIODIC_RESIDUAL = 0; % Take advantage of periodic residual if uniform TEs (will change range_fm)
 %   - algoParams.residual: in case we pre-computed the fit residual (mostly for testing)
 %
-% % imDataParams.mask_fwseparation; % Enables execution of fat-water separation only on the voxels within the
-% % % binary mask
-% %
-% % algoParams.slice_image; % Value of slice to display the images to check intermediate results (mostly for debugging purposes)
 % % algoParams.plot_debug; % Binary flag (1->debugging 0->no debugging) to display images that show intermediate results (useful for debugging code)
-% % algoParams.tik_reg; % Binary flag to include Tikhonov regularization in the inverse problem to claculate phi and eps (1->yes regularization 0->no regularization). Regularization was not included for this paper, but it can enable future research about the the potential need and impact of regularization in these parameters
-% % algoParams.weight; % Weight for the inverse problem to determine correction factors phi and eps. In this paper we tested 0.5
-% % algoParams.fm_init;% Binary flag (1->initial guess 0->no initial guess) to enable the use of an initial guess for the field inhomogeneity term
 %   - residual: the fit residual, of size NUM_FMS X sx X sy
 %   - lmap: spatially varying regularization parameter
 %   - cur_ind: initial indices for field map (the indices determine the field map)
