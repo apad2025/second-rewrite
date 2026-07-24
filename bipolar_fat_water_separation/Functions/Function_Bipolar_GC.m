@@ -250,26 +250,13 @@ else
     snr_thresh = prctile(mag(mask_mag),25);
 end
 
-for kk = vec_slices
-    for xx = 1:matrix_size(1)
-        for yy = 1:matrix_size(2)
-            % Evaluate pixel against SNR threshold
-            if mag(xx,yy,kk) > snr_thresh
-                ff(xx,yy,kk) = c_ff(xx,yy,kk);
-                wf(xx,yy,kk) = c_wf(xx,yy,kk);
-            else
-                % Binary assignment
-                if c_ff(xx,yy,kk) >= algoParams.weight
-                    ff(xx,yy,kk) = 1;
-                    wf(xx,yy,kk) = 0;
-                else % c_ff(xx,yy,kk) < algoParams.weight
-                    ff(xx,yy,kk) = 0;
-                    wf(xx,yy,kk) = 1;
-                end
-            end
-        end
-    end
-end
+% Evaluate pixel against SNR threshold
+ff(mag>snr_thresh) = c_ff(mag>snr_thresh);
+wf(mag>snr_thresh) = c_wf(mag>snr_thresh);
+
+% Binary assignment for those below threshold
+ff(mag<=snr_thresh & c_ff>=algoParams.weight) = 1;
+wf(mag<=snr_thresh & c_ff<algoParams.weight) = 1;
 
 ff = ff.*mask(:,:,:);
 wf = wf.*mask(:,:,:);
