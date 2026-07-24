@@ -36,7 +36,7 @@
 %   - algoParams.NUM_R2STARS = 1; % Numbre of R2* values for quantization
 %   - algoParams.range_fm = [-400 400]; % Range of field map values
 %   - algoParams.NUM_FMS = 301; % Number of field map values to discretize
-%   - algoParams.NUM_ITERS = 40; % Number of graph cut iterations
+%   - algoParams.MAX_ITERS = 40; % Number of graph cut iterations
 %   - algoParams.SUBSAMPLE = 2; % Spatial subsampling for field map estimation (for speed)
 %   - algoParams.DO_OT = 1; % 0,1 flag to enable optimization transfer descent (final stage of field map estimation)
 %   - algoParams.LMAP_POWER = 2; % Spatially-varying regularization (2 gives ~ uniformn resolution)
@@ -218,7 +218,7 @@ if VERBOSE
     fprintf('\nEstimating field map through iterative graph-cuts...')
 end
 %fm = graphCutIterations_OLD(imDataParams,algoParams,residual,lmap,cur_ind);
-[fm,index_fm] = graphCutIterations_Bipolar_GC(imDataParams,algoParams,residual,lmap,cur_ind);
+[fm,index_fm] = graphCutIterations(imDataParams,algoParams,residual,lmap,cur_ind,"Bipolar_GC");
 outParams.index_fm = index_fm;
 
 if VERBOSE
