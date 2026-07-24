@@ -67,7 +67,6 @@ numLocalMin = size(resLocalMinima,1);
 stepoffset = (0:(sx*sy-1))'*numLocalMin;
 ercurrent = 1e10;
 clear cur_ind2
-% $$$ [A] = createExpansionGraphVARPRO_fast(residual, dfm, ones(sx,sy), algoParams.size_clique,ones(sx,sy), ones(sx,sy));
 
 % Main graph-cut loop. At each iteration, a max-flow/min-cut problem is solved
 fm = zeros(sx,sy);
@@ -103,15 +102,9 @@ for kg = 1:algoParams.NUM_ITERS
             validStep = masksignal>0 & stepLocator>=1;
         end
         nextValue = zeros(sx,sy);
-        %     size(validStep)
-        %     stop
         nextValue(validStep) = resLocalMinima(stepoffset(validStep) + stepLocator(validStep));
         cur_step = zeros(sx,sy);
         cur_step(validStep) = nextValue(validStep) - cur_ind(validStep);
-
-        % nosignal_jump = cur_sign*round(abs(deltaF(2))/dfm);
-        %
-        % cur_step(validStep==0) = nosignal_jump;
 
         if rand < 0.5
             nosignal_jump = cur_sign*round(abs(deltaF(2))/dfm);
@@ -146,13 +139,6 @@ for kg = 1:algoParams.NUM_ITERS
     % end
     A(A<0)=0;
 
-    % G = digraph(A)
-    %     figure
-    %     H = plot(G,'EdgeLabel',G.Edges.Weight);
-    %    [mf,GF] = maxflow(G,1,size(A,1))
-    % H.EdgeLabel = {};
-    % highlight(H,GF,'EdgeColor','r','LineWidth',1);
-
     % Solve the max-flow/min-cut problem (max_flow is a function of the matlabBGL library)
     [flowvalTS,cut_TS,RTS,FTS] = max_flow(A',size(A,1),1);
 
@@ -170,25 +156,17 @@ for kg = 1:algoParams.NUM_ITERS
     if sum(sum(A(cut1b==1, cut1b==0))) <= sum(sum(A(cut1==1, cut1==0)))
         cur_indST = cur_ind;
 
-        if DEBUG
-            disp('Not taken');
-        end
+        if DEBUG, disp('Not taken'); end
     else
         cut = reshape(cut1(2:end-1)==0,sx,sy);
         cur_indST = cur_ind + cur_step.*(cut);
         erST = sum(sum(residual(cur_indST(:)+resoffset(:)))) + dfm^2*lambdamap(1,1)*sum(sum(abs(diff(cur_indST,2,1)).^2)) + dfm^2*lambdamap(1,1)*sum(sum(abs(diff(cur_indST,2,2)).^2));
-        if DEBUG
-            disp('Taken');
-            % $$$   pixelschanged = sum(sum(cut));
-        end
+        if DEBUG, disp('Taken'); end
     end
 
     % Update the field map (described as a map of indices in this function)
     prev_ind = cur_ind;
     cur_ind = cur_indST;
-
-    % $$$   size(fms)
-    % $$$   mymax = max(cur_ind(:))
 
     cur_ind(cur_ind<1) = 1;
     cur_ind(cur_ind>length(fms)) = length(fms);
