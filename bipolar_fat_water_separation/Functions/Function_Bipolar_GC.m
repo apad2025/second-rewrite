@@ -17,6 +17,7 @@
 
 function outParams = Function_Bipolar_GC(imDataParams, algoParams , vec_slices, VERBOSE)
 
+%% Evaluate & pull input parameters
 % Check validity of params, and set default algorithm parameters if not provided
 [validParams,algoParams] = checkParamsAndSetDefaults_graphcut_Bipolar_GC(imDataParams,algoParams,vec_slices);
 if validParams==0
@@ -36,7 +37,7 @@ end
 % fat-water separation
 imDataParams.deltaF = [0; algoParams.gyro*(algoParams.species(2).frequency(:) - algoParams.species(1).frequency(1))*(imDataParams.FieldStrength)];
 
-%% Signal for the acquisition with bipolar gradients and without any correction
+%%% Signal for the acquisition with bipolar gradients and without any correction
 
 % If PrecessionIsClockwise=1 the data is loaded without any modification.
 % If PrecessionIsClockwise=-1 data is changed to follow a consistent
@@ -49,21 +50,21 @@ end
 
 input_signal_bipolar_RO = imDataParams.images;
 
-%% Matrix size and number of voxels
+%%% Matrix size and number of voxels
 
 matrix_size = size(input_signal_bipolar_RO);
 nSlices = numel(vec_slices);
 numvox = prod([matrix_size(1:2) nSlices]); % only the slices in vec_slices are corrected
 
-%% Number of echoes
+%%% Number of echoes
 
 numte = matrix_size(5);
 
-%% Echo times for the full bipolar dataset
+%%% Echo times for the full bipolar dataset
 
 TEs_bipolar = imDataParams.TE;
 
-%% Binary mask for fat water separation
+%%% Binary mask for fat water separation
 
 mask = imDataParams.mask_fwseparation;
 
@@ -122,7 +123,7 @@ if algoParams.parallel
     parpool(c, nWorkers);
 end
 
-%% Graph-cut fat-water separation for odd and even echoes
+%% Fat-water separation for odd and even echoes
 if VERBOSE
     fprintf('\nFat-water separation for odd and even echo datasets slice ');
 end
@@ -234,7 +235,6 @@ if algoParams.plot_debug
     title('Initial Fat Map')
 end
 
-%% Fat and water mask (after thresholding using a specific values included in structure params)
 
 ff = zeros(size(c_ff));
 wf = ff;
@@ -290,17 +290,16 @@ if algoParams.plot_debug
 
 end
 
-%% Estimating the error maps using the water and fat signals (these maps are used as initial guesses to determine phase and amplitude effects through an optimization algorithm)
+%% Initial guesses
+%%% Estimating the error maps using the water and fat signals (these maps are used as initial guesses to determine phase and amplitude effects through an optimization algorithm)
 
 complex_map1_water = (Water_GC_odd.*conj(Water_GC_even))./(Water_GC_odd.*conj(Water_GC_odd));
 complex_map1_fat = (Fat_GC_odd.*conj(Fat_GC_even))./(Fat_GC_odd.*conj(Fat_GC_odd));
-
 complex_map1_combined = (complex_map1_water.^wf .* complex_map1_fat.^ff);
 
-%% Calculation of initial phi and eps maps
+%%% Calculation of initial phi and eps maps
 
 phi_map_init = -angle(complex_map1_combined)/2;
-
 eps_map_init = log(abs(complex_map1_combined))/2;
 
 %% Least square solution
@@ -722,7 +721,7 @@ else % Keep phi map as least square result
     phi_map(isnan(phi_map))=0;
 end
 
-%% Total exponential term for correction
+%%% Total exponential term for correction
 
 total_correction = exp(1i*(phi_map - 1i*eps_map)); %exp(2*correction_map).^(1/2);
 
@@ -787,7 +786,7 @@ corrected_bipolar_signal(:,:,vec_slices,:,:) = reshape(corrected_signal,matrix_s
 
 outParams.bipolar_error_map_theta = phi_map - 1i*eps_map;
 
-%% Fat water separation of the corrected signal
+%% Fat-water separation for the corrected signal
 
 imDataParams.TE = TEs_bipolar;
 
