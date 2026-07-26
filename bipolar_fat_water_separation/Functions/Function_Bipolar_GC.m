@@ -878,9 +878,9 @@ else
         FieldMap_unipolar(:,:,kk) = outParams_unipolar.fieldmap;
         R2_unipolar(:,:,kk) = outParams_unipolar.r2starmap;
 
-        GCsteps(kk) = outParams_bipolar.GCsteps;
+        GCsteps(kk) = outParams_unipolar.GCsteps;
         if algoParams.DO_OT
-            OTiters(kk) = outParams_bipolar.OTiters;
+            OTiters(kk) = outParams_unipolar.OTiters;
         end
     end
 end
