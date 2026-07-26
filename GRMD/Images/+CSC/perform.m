@@ -81,10 +81,10 @@ function D = perform(D, flags)
             D.Data.BipolarError = outParams.bipolar_error_map_theta; % phi - i*eps;
             D.Data.Correction = outParams.total_correction; % correction to remove bipolar induced effects, e^(i*BipolarError)
             
-            D.Data.WaterOdd = outParams.Water_GC_odd;
-            D.Data.FatOdd = outParams.Fat_GC_odd;
-            D.Data.WaterEven = outParams.Water_GC_even;
-            D.Data.FatEven = outParams.Fat_GC_even;
+            D.Data.WaterOdd = outParams.Water_bipolar_odd;
+            D.Data.FatOdd = outParams.Fat_bipolar_odd;
+            D.Data.WaterEven = outParams.Water_bipolar_even;
+            D.Data.FatEven = outParams.Fat_bipolar_even;
             D.Data.TotalFieldDualGC = outParams.FieldMap_DualGC;
             D.Data.R2StarDualGC = outParams.R2_DualGC;
 
