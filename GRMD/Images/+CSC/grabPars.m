@@ -57,7 +57,7 @@ function algoParams = grabPars(flags)
             algoParams.TRY_PERIODIC_RESIDUAL    = 1;                           % Take advantage of periodic residual if uniform TEs (will change range_fm)  
             algoParams.DO_OT                    = 1;                           % 0,1 flag to enable optimization transfer descent (final stage of field map estimation)
             algoParams.tik_reg                  = 0;                           % Tikhonov regularization binary flag
-            algoParams.plot_debug               = true;
+            algoParams.plot_debug               = false;
             algoParams.parallel                 = false;
             algoParams.seed                     = 0;                           % rng seed. If empty, seed will not be set
 
