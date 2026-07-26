@@ -1,5 +1,5 @@
 % Correct chemical shift for a single slice
-function [D, Data] = performSlice(D, flags, sl, snr_thresh)
+function [D, Data, Stats] = performSlice(D, flags, sl, snr_thresh)
 % Inputs:
 %             D: data structure
 %         flags: processing structure
@@ -9,6 +9,8 @@ function [D, Data] = performSlice(D, flags, sl, snr_thresh)
 % Outputs:
 %             D: data structure, with the echo times updated to match
 %          Data: corrected data for the requested slice
+%         Stats: solver iteration counts for the requested slice, stacked back
+%                into D.CSCorrection by CSC.assemble
 %
 % Note: this is the BipolarIGC branch of CSC.perform restricted to one slice,
 % so that the slices can be run as independent jobs and stacked afterwards by
@@ -74,4 +76,12 @@ function [D, Data] = performSlice(D, flags, sl, snr_thresh)
     Data.FatEven = outParams.Fat_GC_even(:,:,sl);
     Data.TotalFieldDualGC = outParams.FieldMap_DualGC(:,:,sl);
     Data.R2StarDualGC = outParams.R2_DualGC(:,:,sl);
+
+    % Solver statistics, kept out of Data so that CSC.assemble stacks them as
+    % metadata rather than as images
+    Stats.BipolarIterations = outParams.GCsteps_bipolar(sl); % odd/even (Bipolar_GC) graph cuts
+    Stats.Iterations = outParams.GCsteps(sl);                % synthetic unipolar graph cuts
+    if isfield(outParams, 'OTiters')
+        Stats.OTIterations = outParams.OTiters(sl);
+    end
 end

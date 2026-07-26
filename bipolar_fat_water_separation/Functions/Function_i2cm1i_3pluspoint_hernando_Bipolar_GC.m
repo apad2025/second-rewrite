@@ -60,6 +60,7 @@
 %   - outParams.species(ii).amps: estimated water/fat images, size [nx,ny,ncoils]
 %   - outParams.r2starmap: R2* map (in s^{-1}, size [nx,ny])
 %   - outParams.fieldmap: field map (in Hz, size [nx,ny])
+%   - outParams.GCsteps: number of graph-cut steps
 %
 %
 % Author: Diego Hernando
@@ -218,8 +219,7 @@ if VERBOSE
     fprintf('\nEstimating field map through iterative graph-cuts...')
 end
 %fm = graphCutIterations_OLD(imDataParams,algoParams,residual,lmap,cur_ind);
-[fm,index_fm] = graphCutIterations(imDataParams,algoParams,residual,lmap,cur_ind,"Bipolar_GC");
-outParams.index_fm = index_fm;
+[fm,index_fm,GCsteps] = graphCutIterations(imDataParams,algoParams,residual,lmap,cur_ind,"Bipolar_GC");
 
 if VERBOSE
     tttime = toc;
@@ -312,3 +312,6 @@ outParams.species(4).amps = f_even;
 outParams.r2starmap = r2starmap;
 outParams.fieldmap = fm;
 outParams.residual = residual;
+
+outParams.index_fm = index_fm;
+outParams.GCsteps = GCsteps;

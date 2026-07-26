@@ -416,10 +416,10 @@ if ~D.Flags.CorrectedChemicalShift && cscFLAG
             end
 
             load(fl_snr, 'snr_thresh')
-            [D, Data] = CSC.performSlice(D, flags, sl, snr_thresh);
+            [D, Data, Stats] = CSC.performSlice(D, flags, sl, snr_thresh);
 
             TE = D.TE;
-            save(fullfile(pth_slices, sprintf('%s_%03i.mat', snames.CorrectedCS, sl)), 'Data', 'TE', '-v7.3');
+            save(fullfile(pth_slices, sprintf('%s_%03i.mat', snames.CorrectedCS, sl)), 'Data', 'TE', 'Stats', '-v7.3');
 
             if flags.verbose; fprintf('\nSaved slice %i of %i\n', sl, D.Size(3)); end
             return

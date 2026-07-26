@@ -75,34 +75,42 @@ if isscalar(mask) && mask==1
 end
 
 %%% Set MAX_STALLEDITERS
-MAX_STALLEDITERS_GC = algoParams.MAX_STALLEDITERS_GC;
+MAX_STALLEDITERS_bipolar = algoParams.MAX_STALLEDITERS_bipolar;
 MAX_STALLEDITERS = algoParams.MAX_STALLEDITERS;
 
 %% Memory allocation
 
 % Field maps and R2 star maps
-Water_GC_odd = zeros(matrix_size(1:3));
+Water_bipolar_odd = zeros(matrix_size(1:3));
 % residual = zeros([algoParams.NUM_FMS, matrix_size(1:3)]);
 if algoParams.parallel
-    Water_GC_odd = cell(matrix_size(3),1);
+    Water_bipolar_odd = cell(matrix_size(3),1);
     for kk = vec_slices
-        Water_GC_odd{kk} = zeros(matrix_size(1:2));
+        Water_bipolar_odd{kk} = zeros(matrix_size(1:2));
     % residual = squeeze(mat2cell(residual, algoParams.NUM_FMS, matrix_size(1), matrix_size(2), ones([matrix_size(3),1])));
     end
 end
 
-Fat_GC_odd = Water_GC_odd;
+Fat_bipolar_odd = Water_bipolar_odd;
 
-Water_GC_even = Water_GC_odd;
-Fat_GC_even = Water_GC_odd;
+Water_bipolar_even = Water_bipolar_odd;
+Fat_bipolar_even = Water_bipolar_odd;
 
-FieldMap_DualGC = Water_GC_odd;
-R2_DualGC = Water_GC_odd;
+FieldMap_DualGC = Water_bipolar_odd;
+R2_DualGC = Water_bipolar_odd;
 
-Water_bipolar = Water_GC_odd;
-Fat_bipolar = Water_GC_odd;
-FieldMap_bipolar = Water_GC_odd;
-R2_bipolar = Water_GC_odd;
+Water_unipolar = Water_bipolar_odd;
+Fat_unipolar = Water_bipolar_odd;
+FieldMap_unipolar = Water_bipolar_odd;
+R2_unipolar = Water_bipolar_odd;
+
+% Iteration counts, one entry per slice. Slices outside vec_slices stay NaN so
+% that a job-array save can be told apart from a slice that converged instantly.
+GCsteps_bipolar = nan(matrix_size(3),1);
+GCsteps = GCsteps_bipolar;
+if algoParams.DO_OT
+    OTiters = GCsteps_bipolar;
+end
 
 %% Parallel pool sized to the SLURM allocation
 if algoParams.parallel
@@ -129,7 +137,7 @@ end
 
 %% Fat-water separation for odd and even echoes
 % Temporarily set MAX_STALLEDITERS
-algoParams.MAX_STALLEDITERS = MAX_STALLEDITERS_GC;
+algoParams.MAX_STALLEDITERS = MAX_STALLEDITERS_bipolar;
 
 if VERBOSE
     fprintf('\nFat-water separation for odd and even echo datasets slice ');
@@ -137,44 +145,47 @@ end
 
 if algoParams.parallel
     % assign only the relevant indexed parameters to each tmp worker
-    imDataParams_cell = Water_GC_odd;
+    imDataParams_cell = Water_bipolar_odd;
     for kk = vec_slices
         imDataParams_cell{kk} = imDataParams;
         imDataParams_cell{kk}.images = imDataParams.images(:,:,kk,:,:);
         imDataParams_cell{kk}.mask = mask(:,:,kk);
         imDataParams_cell{kk}.sliceofint = kk;
     end
+    GCsteps_bipolar = mat2cell(GCsteps_bipolar,ones(matrix_size(3),1));
 
     parfor kk = vec_slices
-        outParams_GC = Function_i2cm1i_3pluspoint_hernando_Bipolar_GC(imDataParams_cell{kk}, algoParams, VERBOSE);
+        outParams_bipolar = Function_i2cm1i_3pluspoint_hernando_Bipolar_GC(imDataParams_cell{kk}, algoParams, VERBOSE);
     
-        Water_GC_odd{kk} = outParams_GC.species(1).amps;
-        Fat_GC_odd{kk} = outParams_GC.species(2).amps;
+        Water_bipolar_odd{kk} = outParams_bipolar.species(1).amps;
+        Fat_bipolar_odd{kk} = outParams_bipolar.species(2).amps;
     
-        Water_GC_even{kk} = (outParams_GC.species(3).amps);
-        Fat_GC_even{kk} = (outParams_GC.species(4).amps);
+        Water_bipolar_even{kk} = (outParams_bipolar.species(3).amps);
+        Fat_bipolar_even{kk} = (outParams_bipolar.species(4).amps);
     
-        FieldMap_DualGC{kk} = outParams_GC.fieldmap;
-        R2_DualGC{kk} = outParams_GC.r2starmap;
+        FieldMap_DualGC{kk} = outParams_bipolar.fieldmap;
+        R2_DualGC{kk} = outParams_bipolar.r2starmap;
         % residual{kk} = outParams_GC.residual;
+        GCsteps_bipolar{kk} = outParams_bipolar.GCsteps;
     end
 
     % Extract from cell arrays
-    Water_GC_odd_cell = Water_GC_odd; Water_GC_odd = zeros(matrix_size(1:3));
-    Fat_GC_odd_cell = Fat_GC_odd; Fat_GC_odd = Water_GC_odd;
-    Water_GC_even_cell = Water_GC_even; Water_GC_even = Water_GC_odd;
-    Fat_GC_even_cell = Fat_GC_even; Fat_GC_even = Water_GC_odd;
-    FieldMap_DualGC_cell = FieldMap_DualGC; FieldMap_DualGC = Water_GC_odd;
-    R2_DualGC_cell = R2_DualGC; R2_DualGC = Water_GC_odd;
+    Water_bipolar_odd_cell = Water_bipolar_odd; Water_bipolar_odd = zeros(matrix_size(1:3));
+    Fat_bipolar_odd_cell = Fat_bipolar_odd; Fat_bipolar_odd = Water_bipolar_odd;
+    Water_bipolar_even_cell = Water_bipolar_even; Water_bipolar_even = Water_bipolar_odd;
+    Fat_bipolar_even_cell = Fat_bipolar_even; Fat_bipolar_even = Water_bipolar_odd;
+    FieldMap_DualGC_cell = FieldMap_DualGC; FieldMap_DualGC = Water_bipolar_odd;
+    R2_DualGC_cell = R2_DualGC; R2_DualGC = Water_bipolar_odd;
     for kk = vec_slices
-        Water_GC_odd(:,:,kk) = Water_GC_odd_cell{kk};
-        Fat_GC_odd(:,:,kk) = Fat_GC_odd_cell{kk};
-        Water_GC_even(:,:,kk) = Water_GC_even_cell{kk};
-        Fat_GC_even(:,:,kk) = Fat_GC_even_cell{kk};
+        Water_bipolar_odd(:,:,kk) = Water_bipolar_odd_cell{kk};
+        Fat_bipolar_odd(:,:,kk) = Fat_bipolar_odd_cell{kk};
+        Water_bipolar_even(:,:,kk) = Water_bipolar_even_cell{kk};
+        Fat_bipolar_even(:,:,kk) = Fat_bipolar_even_cell{kk};
         FieldMap_DualGC(:,:,kk) = FieldMap_DualGC_cell{kk};
         R2_DualGC(:,:,kk) = R2_DualGC_cell{kk};
     end
-    clear Water_GC_odd_cell Fat_GC_odd_cell Water_GC_even_cell Fat_GC_even_cell FieldMap_DualGC_cell R2_DualGC_cell
+    GCsteps_bipolar = cell2mat(GCsteps_bipolar);
+    clear Water_bipolar_odd_cell Fat_bipolar_odd_cell Water_bipolar_even_cell Fat_bipolar_even_cell FieldMap_DualGC_cell R2_DualGC_cell
 
 else
     for kk = vec_slices
@@ -184,17 +195,19 @@ else
         end
 
         imDataParams.sliceofint = kk;
-        outParams_GC = Function_i2cm1i_3pluspoint_hernando_Bipolar_GC(imDataParams, algoParams, VERBOSE);
+        outParams_bipolar = Function_i2cm1i_3pluspoint_hernando_Bipolar_GC(imDataParams, algoParams, VERBOSE);
 
-        Water_GC_odd(:,:,kk) = outParams_GC.species(1).amps;
-        Fat_GC_odd(:,:,kk) = outParams_GC.species(2).amps;
+        Water_bipolar_odd(:,:,kk) = outParams_bipolar.species(1).amps;
+        Fat_bipolar_odd(:,:,kk) = outParams_bipolar.species(2).amps;
 
-        Water_GC_even(:,:,kk) = (outParams_GC.species(3).amps);
-        Fat_GC_even(:,:,kk) = (outParams_GC.species(4).amps);
+        Water_bipolar_even(:,:,kk) = (outParams_bipolar.species(3).amps);
+        Fat_bipolar_even(:,:,kk) = (outParams_bipolar.species(4).amps);
 
-        FieldMap_DualGC(:,:,kk) = outParams_GC.fieldmap;
-        R2_DualGC(:,:,kk) = outParams_GC.r2starmap;
+        FieldMap_DualGC(:,:,kk) = outParams_bipolar.fieldmap;
+        R2_DualGC(:,:,kk) = outParams_bipolar.r2starmap;
         % residual(:,:,:,kk) = outParams_GC.residual;
+
+        GCsteps_bipolar(kk) = outParams_bipolar.GCsteps;
     end
 end
 
@@ -205,7 +218,7 @@ algoParams.MAX_STALLEDITERS = MAX_STALLEDITERS;
 
 slice_image = algoParams.slice_image;
 
-[c_ff, c_wf] = Function_Fat_Quantification_Bipolar_GC(Fat_GC_odd, Water_GC_odd);
+[c_ff, c_wf] = Function_Fat_Quantification_Bipolar_GC(Fat_bipolar_odd, Water_bipolar_odd);
 
 c_ff = c_ff.*mask(:,:,:);
 c_ff(c_ff>=1) = 1;
@@ -260,8 +273,8 @@ else
     snr_thresh = prctile(mag(mask_SNR),25);
 end
 
-ff_DualGC = abs(Fat_GC_odd)./(abs(Water_GC_odd) + abs(Fat_GC_odd));
-wf_DualGC = abs(Water_GC_odd)./(abs(Water_GC_odd) + abs(Fat_GC_odd));
+ff_DualGC = abs(Fat_bipolar_odd)./(abs(Water_bipolar_odd) + abs(Fat_bipolar_odd));
+wf_DualGC = abs(Water_bipolar_odd)./(abs(Water_bipolar_odd) + abs(Fat_bipolar_odd));
 thresh = wf_DualGC>0.15 & ff_DualGC>0.15 & mag>snr_thresh;
 
 % Evaluate pixel against SNR & extreme fraction threshold
@@ -307,8 +320,8 @@ end
 %% Initial guesses
 %%% Estimating the error maps using the water and fat signals (these maps are used as initial guesses to determine phase and amplitude effects through an optimization algorithm)
 
-complex_map1_water = (Water_GC_odd.*conj(Water_GC_even))./(Water_GC_odd.*conj(Water_GC_odd));
-complex_map1_fat = (Fat_GC_odd.*conj(Fat_GC_even))./(Fat_GC_odd.*conj(Fat_GC_odd));
+complex_map1_water = (Water_bipolar_odd.*conj(Water_bipolar_even))./(Water_bipolar_odd.*conj(Water_bipolar_odd));
+complex_map1_fat = (Fat_bipolar_odd.*conj(Fat_bipolar_even))./(Fat_bipolar_odd.*conj(Fat_bipolar_odd));
 complex_map1_combined = (complex_map1_water.^wf .* complex_map1_fat.^ff);
 
 %%% Calculation of initial phi and eps maps
@@ -330,8 +343,8 @@ correction_map_unwrapped = b1;
 correction_map = b1;
 
 % Calculate b matrix
-b1(:,:,vec_slices) = 0.5.*(log(Water_GC_even(:,:,vec_slices)) - log(Water_GC_odd(:,:,vec_slices)));
-b2(:,:,vec_slices) = 0.5.*(log(Fat_GC_even(:,:,vec_slices)) - log(Fat_GC_odd(:,:,vec_slices)));
+b1(:,:,vec_slices) = 0.5.*(log(Water_bipolar_even(:,:,vec_slices)) - log(Water_bipolar_odd(:,:,vec_slices)));
+b2(:,:,vec_slices) = 0.5.*(log(Fat_bipolar_even(:,:,vec_slices)) - log(Fat_bipolar_odd(:,:,vec_slices)));
 b(:,:,:,vec_slices) = cat(1, reshape(wf(:,:,vec_slices).*b1(:,:,vec_slices), [1 size(wf(:,:,vec_slices))]), reshape(ff(:,:,vec_slices).*b2(:,:,vec_slices), [1 size(wf(:,:,vec_slices))]));
 
 if VERBOSE
@@ -559,7 +572,7 @@ if algoParams.plot_debug
     FW_tiles = tiledlayout(3,6,"TileSpacing","compact","Padding","compact");
 
     nexttile(FW_tiles, 1)
-    imagesc(sqrt(Water_GC_odd(:,:,slice_image).*conj(Water_GC_odd(:,:,slice_image))).*mask(:,:,slice_image))
+    imagesc(sqrt(Water_bipolar_odd(:,:,slice_image).*conj(Water_bipolar_odd(:,:,slice_image))).*mask(:,:,slice_image))
     axis image
     axis off
     title("Water Image (TE_{odd})","Interpreter","tex")
@@ -568,7 +581,7 @@ if algoParams.plot_debug
     ylabel(hc,'[a.u.]','Units', 'normalized', 'Position', [2.5, 0.5],'Rotation',90);
 
     nexttile(FW_tiles, 7)
-    imagesc(sqrt(Water_GC_even(:,:,slice_image).*conj(Water_GC_even(:,:,slice_image))).*mask(:,:,slice_image))
+    imagesc(sqrt(Water_bipolar_even(:,:,slice_image).*conj(Water_bipolar_even(:,:,slice_image))).*mask(:,:,slice_image))
     axis image
     axis off
     title("Water Image (TE_{even})","Interpreter","tex")
@@ -577,7 +590,7 @@ if algoParams.plot_debug
     ylabel(hc,'[a.u.]','Units', 'normalized', 'Position', [2.5, 0.5],'Rotation',90);
 
     nexttile(FW_tiles, 2)
-    imagesc(sqrt(Fat_GC_odd(:,:,slice_image).*conj(Fat_GC_odd(:,:,slice_image))).*mask(:,:,slice_image))
+    imagesc(sqrt(Fat_bipolar_odd(:,:,slice_image).*conj(Fat_bipolar_odd(:,:,slice_image))).*mask(:,:,slice_image))
     axis image
     axis off
     title("Fat Image (TE_{odd})","Interpreter","tex")
@@ -586,7 +599,7 @@ if algoParams.plot_debug
     ylabel(hc,'[a.u.]','Units', 'normalized', 'Position', [2.5, 0.5],'Rotation',90);
 
     nexttile(FW_tiles, 8)
-    imagesc(sqrt(Fat_GC_even(:,:,slice_image).*conj(Fat_GC_even(:,:,slice_image))).*mask(:,:,slice_image))
+    imagesc(sqrt(Fat_bipolar_even(:,:,slice_image).*conj(Fat_bipolar_even(:,:,slice_image))).*mask(:,:,slice_image))
     axis image
     axis off
     title("Fat Image (TE_{even})","Interpreter","tex")
@@ -636,7 +649,7 @@ if algoParams.plot_debug
     FW_tiles2 = tiledlayout(3,6,"TileSpacing","compact","Padding","compact");
 
     nexttile(FW_tiles2, 1)
-    imagesc(angle(Water_GC_odd(:,:,slice_image)).*mask(:,:,slice_image))
+    imagesc(angle(Water_bipolar_odd(:,:,slice_image)).*mask(:,:,slice_image))
     axis image
     axis off
     title("Water Phase (TE_{odd})","Interpreter","tex")
@@ -645,7 +658,7 @@ if algoParams.plot_debug
     ylabel(hc,'[a.u.]','Units', 'normalized', 'Position', [2.5, 0.5],'Rotation',90);
 
     nexttile(FW_tiles2, 7)
-    imagesc(angle(Water_GC_even(:,:,slice_image)).*mask(:,:,slice_image))
+    imagesc(angle(Water_bipolar_even(:,:,slice_image)).*mask(:,:,slice_image))
     axis image
     axis off
     title("Water Phase (TE_{even})","Interpreter","tex")
@@ -654,7 +667,7 @@ if algoParams.plot_debug
     ylabel(hc,'[a.u.]','Units', 'normalized', 'Position', [2.5, 0.5],'Rotation',90);
 
     nexttile(FW_tiles2, 2)
-    imagesc(angle(Fat_GC_odd(:,:,slice_image)).*mask(:,:,slice_image))
+    imagesc(angle(Fat_bipolar_odd(:,:,slice_image)).*mask(:,:,slice_image))
     axis image
     axis off
     title("Fat Phase (TE_{odd})","Interpreter","tex")
@@ -663,7 +676,7 @@ if algoParams.plot_debug
     ylabel(hc,'[a.u.]','Units', 'normalized', 'Position', [2.5, 0.5],'Rotation',90);
 
     nexttile(FW_tiles2, 8)
-    imagesc(angle(Fat_GC_even(:,:,slice_image)).*mask(:,:,slice_image))
+    imagesc(angle(Fat_bipolar_even(:,:,slice_image)).*mask(:,:,slice_image))
     axis image
     axis off
     title("Fat Phase (TE_{even})","Interpreter","tex")
@@ -815,28 +828,41 @@ if algoParams.parallel
     for kk = 1:matrix_size(3)
         imDataParams_cell{kk}.images = corrected_bipolar_signal(:,:,kk,:,:);
     end
+    GCsteps = mat2cell(GCsteps,ones(matrix_size(3),1));
+    if algoParams.DO_OT
+        OTiters = mat2cell(OTiters,ones(matrix_size(3),1));
+    end
 
-    parfor kk = vec_slices        
-        outParams_bipolar = fw_i2cm1i_3pluspoint_hernando_graphcut(imDataParams_cell{kk}, algoParams, VERBOSE);
-    
-        Water_bipolar{kk} = outParams_bipolar.species(1).amps;
-        Fat_bipolar{kk} = outParams_bipolar.species(2).amps;
-        FieldMap_bipolar{kk} = outParams_bipolar.fieldmap;
-        R2_bipolar{kk} = outParams_bipolar.r2starmap;
+    parfor kk = vec_slices
+        outParams_unipolar = fw_i2cm1i_3pluspoint_hernando_graphcut(imDataParams_cell{kk}, algoParams, VERBOSE);
+
+        Water_unipolar{kk} = outParams_unipolar.species(1).amps;
+        Fat_unipolar{kk} = outParams_unipolar.species(2).amps;
+        FieldMap_unipolar{kk} = outParams_unipolar.fieldmap;
+        R2_unipolar{kk} = outParams_unipolar.r2starmap;
+
+        GCsteps{kk} = outParams_unipolar.GCsteps;
+        if algoParams.DO_OT
+            OTiters{kk} = outParams_unipolar.OTiters;
+        end
     end
 
     % Extract from cell arrays
-    Water_bipolar_cell = Water_bipolar; Water_bipolar = zeros(matrix_size(1:3));
-    Fat_bipolar_cell = Fat_bipolar; Fat_bipolar = Water_bipolar;
-    FieldMap_bipolar_cell = FieldMap_bipolar; FieldMap_bipolar = Water_bipolar;
-    R2_bipolar_cell = R2_bipolar; R2_bipolar = Water_bipolar;
+    Water_unipolar_cell = Water_unipolar; Water_unipolar = zeros(matrix_size(1:3));
+    Fat_unipolar_cell = Fat_unipolar; Fat_unipolar = Water_unipolar;
+    FieldMap_unipolar_cell = FieldMap_unipolar; FieldMap_unipolar = Water_unipolar;
+    R2_unipolar_cell = R2_unipolar; R2_unipolar = Water_unipolar;
     for kk = vec_slices
-        Water_bipolar(:,:,kk) = Water_bipolar_cell{kk};
-        Fat_bipolar(:,:,kk) = Fat_bipolar_cell{kk};
-        FieldMap_bipolar(:,:,kk) = FieldMap_bipolar_cell{kk};
-        R2_bipolar(:,:,kk) = R2_bipolar_cell{kk};
+        Water_unipolar(:,:,kk) = Water_unipolar_cell{kk};
+        Fat_unipolar(:,:,kk) = Fat_unipolar_cell{kk};
+        FieldMap_unipolar(:,:,kk) = FieldMap_unipolar_cell{kk};
+        R2_unipolar(:,:,kk) = R2_unipolar_cell{kk};
     end
-    clear Water_bipolar_cell Fat_bipolar_cell FieldMap_bipolar_cell R2_bipolar_cell
+    GCsteps = cell2mat(GCsteps);
+    if algoParams.DO_OT
+        OTiters = cell2mat(OTiters);
+    end
+    clear Water_unipolar_cell Fat_unipolar_cell FieldMap_unipolar_cell R2_unipolar_cell
 
 else
     for kk = vec_slices
@@ -845,12 +871,17 @@ else
         end
         imDataParams.images = corrected_bipolar_signal(:,:,kk,:,:); % Originaly size[nx,ny,nz,ncoils,nechoes] Note: This specific order is required for GC algorithm
 
-        outParams_bipolar = fw_i2cm1i_3pluspoint_hernando_graphcut(imDataParams, algoParams, VERBOSE);
+        outParams_unipolar = fw_i2cm1i_3pluspoint_hernando_graphcut(imDataParams, algoParams, VERBOSE);
 
-        Water_bipolar(:,:,kk) = outParams_bipolar.species(1).amps;
-        Fat_bipolar(:,:,kk) = outParams_bipolar.species(2).amps;
-        FieldMap_bipolar(:,:,kk) = outParams_bipolar.fieldmap;
-        R2_bipolar(:,:,kk) = outParams_bipolar.r2starmap;
+        Water_unipolar(:,:,kk) = outParams_unipolar.species(1).amps;
+        Fat_unipolar(:,:,kk) = outParams_unipolar.species(2).amps;
+        FieldMap_unipolar(:,:,kk) = outParams_unipolar.fieldmap;
+        R2_unipolar(:,:,kk) = outParams_unipolar.r2starmap;
+
+        GCsteps(kk) = outParams_bipolar.GCsteps;
+        if algoParams.DO_OT
+            OTiters(kk) = outParams_bipolar.OTiters;
+        end
     end
 end
 
@@ -864,7 +895,7 @@ end
 if algoParams.plot_debug
 
     nexttile(FW_tiles, 13)
-    imagesc(abs(Water_bipolar(:,:,slice_image)).*mask(:,:,slice_image));
+    imagesc(abs(Water_unipolar(:,:,slice_image)).*mask(:,:,slice_image));
     axis image
     axis off
     title("Water Image")
@@ -873,7 +904,7 @@ if algoParams.plot_debug
     ylabel(hc,'[a.u.]','Units', 'normalized', 'Position', [2.5, 0.5],'Rotation',90);
 
     nexttile(FW_tiles, 14)
-    imagesc(abs(Fat_bipolar(:,:,slice_image)).*mask(:,:,slice_image));
+    imagesc(abs(Fat_unipolar(:,:,slice_image)).*mask(:,:,slice_image));
     axis image
     axis off
     title("Fat Image")
@@ -882,7 +913,7 @@ if algoParams.plot_debug
     ylabel(hc,'[a.u.]','Units', 'normalized', 'Position', [2.5, 0.5],'Rotation',90);
 
     nexttile(FW_tiles, 15)
-    imagesc(FieldMap_bipolar(:,:,slice_image));
+    imagesc(FieldMap_unipolar(:,:,slice_image));
     axis image
     axis off
     title("Field Map")
@@ -891,7 +922,7 @@ if algoParams.plot_debug
     ylabel(hc,'[Hz]','Units', 'normalized', 'Position', [2.5, 0.5],'Rotation',90);
 
     nexttile(FW_tiles, 16)
-    imagesc(R2_bipolar(:,:,slice_image).*mask(:,:,slice_image));
+    imagesc(R2_unipolar(:,:,slice_image).*mask(:,:,slice_image));
     axis image
     axis off
     title("R_2^* Map","Interpreter","tex")
@@ -900,7 +931,7 @@ if algoParams.plot_debug
     ylabel(hc,'[s^{-1}]','Units', 'normalized', 'Position', [2.5, 0.5],'Rotation',90);
 
     nexttile(FW_tiles2, 13)
-    imagesc(angle(Water_bipolar(:,:,slice_image)).*mask(:,:,slice_image));
+    imagesc(angle(Water_unipolar(:,:,slice_image)).*mask(:,:,slice_image));
     axis image
     axis off
     title("Water Phase")
@@ -909,7 +940,7 @@ if algoParams.plot_debug
     ylabel(hc,'[a.u.]','Units', 'normalized', 'Position', [2.5, 0.5],'Rotation',90);
 
     nexttile(FW_tiles2, 14)
-    imagesc(angle(Fat_bipolar(:,:,slice_image)).*mask(:,:,slice_image));
+    imagesc(angle(Fat_unipolar(:,:,slice_image)).*mask(:,:,slice_image));
     axis image
     axis off
     title("Fat Phase")
@@ -918,7 +949,7 @@ if algoParams.plot_debug
     ylabel(hc,'[a.u.]','Units', 'normalized', 'Position', [2.5, 0.5],'Rotation',90);
 
     nexttile(FW_tiles2, 15)
-    imagesc(FieldMap_bipolar(:,:,slice_image));
+    imagesc(FieldMap_unipolar(:,:,slice_image));
     axis image
     axis off
     title("Field Map")
@@ -927,7 +958,7 @@ if algoParams.plot_debug
     ylabel(hc,'[Hz]','Units', 'normalized', 'Position', [2.5, 0.5],'Rotation',90);
 
     nexttile(FW_tiles2, 16)
-    imagesc(R2_bipolar(:,:,slice_image).*mask(:,:,slice_image));
+    imagesc(R2_unipolar(:,:,slice_image).*mask(:,:,slice_image));
     axis image
     axis off
     title("R_2^* Map","Interpreter","tex")
@@ -939,16 +970,16 @@ end
 %% Creating the output for the function
 
 % Water signal for fat-water separation using all echoes
-outParams.species(1).amps = Water_bipolar;
+outParams.species(1).amps = Water_unipolar;
 
 % Fat signal for fat-water separation using all echoes
-outParams.species(2).amps = Fat_bipolar;
+outParams.species(2).amps = Fat_unipolar;
 
 % R2 star map using all echoes
-outParams.r2starmap = R2_bipolar;
+outParams.r2starmap = R2_unipolar;
 
 % Field map using all echoes
-outParams.fieldmap = FieldMap_bipolar;
+outParams.fieldmap = FieldMap_unipolar;
 
 % Phi map (related to phase modulation due to bipolar readout)
 outParams.phi_map = phi_map;
@@ -963,12 +994,19 @@ outParams.corrected_bipolar_signal = corrected_bipolar_signal;
 outParams.total_correction = total_correction;
 
 % Results from dualGC odd and even echoes
-outParams.Water_GC_odd = Water_GC_odd;
-outParams.Fat_GC_odd = Fat_GC_odd;
-outParams.Water_GC_even = Water_GC_even;
-outParams.Fat_GC_even = Fat_GC_even;
+outParams.Water_bipolar_odd = Water_bipolar_odd;
+outParams.Fat_bipolar_odd = Fat_bipolar_odd;
+outParams.Water_bipolar_even = Water_bipolar_even;
+outParams.Fat_bipolar_even = Fat_bipolar_even;
 outParams.FieldMap_DualGC = FieldMap_DualGC;
 outParams.R2_DualGC = R2_DualGC;
+outParams.GCsteps_bipolar = GCsteps_bipolar;
+
+% Other misc stats from hernandoGC
+outParams.GCsteps = GCsteps;
+if algoParams.DO_OT
+    outParams.OTiters = OTiters;
+end
 % Preserve prior behavior: keep the residual of the last processed slice
 % (outParams_GC no longer survives the parfor loop above).
 % outParams.residual = residuals{vec_slices(end)};
