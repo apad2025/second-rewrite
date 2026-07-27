@@ -70,10 +70,10 @@ function [D, Data, Stats] = performSlice(D, flags, sl, snr_thresh)
     Data.BipolarError = outParams.bipolar_error_map_theta(:,:,sl); % phi - i*eps;
     Data.Correction = outParams.total_correction(:,:,sl); % correction to remove bipolar induced effects, e^(i*BipolarError)
 
-    Data.WaterOdd = outParams.Water_GC_odd(:,:,sl);
-    Data.FatOdd = outParams.Fat_GC_odd(:,:,sl);
-    Data.WaterEven = outParams.Water_GC_even(:,:,sl);
-    Data.FatEven = outParams.Fat_GC_even(:,:,sl);
+    Data.WaterOdd = outParams.Water_bipolar_odd(:,:,sl);
+    Data.FatOdd = outParams.Fat_bipolar_odd(:,:,sl);
+    Data.WaterEven = outParams.Water_bipolar_even(:,:,sl);
+    Data.FatEven = outParams.Fat_bipolar_even(:,:,sl);
     Data.TotalFieldDualGC = outParams.FieldMap_DualGC(:,:,sl);
     Data.R2StarDualGC = outParams.R2_DualGC(:,:,sl);
 
