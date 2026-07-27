@@ -39,6 +39,7 @@ function algoParams = grabPars(flags)
             algoParams.species = struct('name', {'water', 'fat'}, ...
                                    'frequency', {0, [-3.8,  -3.4,  -2.6,  -1.94, -0.39,  0.6]}, ...
                                      'relAmps', {1, [ 0.087, 0.693, 0.128, 0.004, 0.039, 0.048]});
+            algoParams.species(2).frequency = -algoParams.species(2).frequency;% Invert frequency signs to fix swapping
             algoParams.size_clique              = 1;                           % Size of MRF neighborhood (1 uses an 8-neighborhood, common in 2D)
             algoParams.range_r2star             = [0 300];                     % Range of R2* values
             algoParams.NUM_R2STARS              = 101;                         % Number of R2* values for quantization (default = 11)
