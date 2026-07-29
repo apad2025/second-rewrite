@@ -39,7 +39,6 @@ function algoParams = grabPars(flags)
             algoParams.species = struct('name', {'water', 'fat'}, ...
                                    'frequency', {0, [-3.8,  -3.4,  -2.6,  -1.94, -0.39,  0.6]}, ...
                                      'relAmps', {1, [ 0.087, 0.693, 0.128, 0.004, 0.039, 0.048]});
-            algoParams.species(2).frequency = -algoParams.species(2).frequency;% Invert frequency signs to fix swapping
             algoParams.size_clique              = 1;                           % Size of MRF neighborhood (1 uses an 8-neighborhood, common in 2D)
             algoParams.range_r2star             = [0 300];                     % Range of R2* values
             algoParams.NUM_R2STARS              = 101;                         % Number of R2* values for quantization (default = 11)
@@ -56,7 +55,7 @@ function algoParams = grabPars(flags)
             algoParams.lambda                   = 0.10;                        % Regularization parameter for graph-cut 
             algoParams.LMAP_EXTRA               = 0.15;                        % Additional regularization for low-signal regions
             algoParams.TRY_PERIODIC_RESIDUAL    = 1;                           % Take advantage of periodic residual if uniform TEs (will change range_fm)  
-            algoParams.DO_OT                    = 0;                           % 0,1 flag to enable optimization transfer descent (final stage of field map estimation)
+            algoParams.DO_OT                    = 1;                           % 0,1 flag to enable optimization transfer descent (final stage of field map estimation)
             algoParams.tik_reg                  = 0;                           % Tikhonov regularization binary flag
             algoParams.plot_debug               = false;
             algoParams.parallel                 = false;
