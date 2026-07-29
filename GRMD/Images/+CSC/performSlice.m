@@ -65,17 +65,17 @@ function [D, Data, Stats] = performSlice(D, flags, sl, snr_thresh)
     Data.Fat = outParams.species(2).amps(:,:,sl);
     Data.TotalField = outParams.fieldmap(:,:,sl);
     Data.R2Star = outParams.r2starmap(:,:,sl);
-    Data.Phi = outParams.phi_map(:,:,sl); % related to phase modulation due to bipolar readout
-    Data.Epsilon = outParams.eps_map(:,:,sl); % related to amplitude modulation due to bipolar readout
+    % Data.Phi = outParams.phi_map(:,:,sl); % related to phase modulation due to bipolar readout
+    % Data.Epsilon = outParams.eps_map(:,:,sl); % related to amplitude modulation due to bipolar readout
     Data.BipolarError = outParams.bipolar_error_map_theta(:,:,sl); % phi - i*eps;
     Data.Correction = outParams.total_correction(:,:,sl); % correction to remove bipolar induced effects, e^(i*BipolarError)
 
-    Data.WaterOdd = outParams.Water_bipolar_odd(:,:,sl);
-    Data.FatOdd = outParams.Fat_bipolar_odd(:,:,sl);
-    Data.WaterEven = outParams.Water_bipolar_even(:,:,sl);
-    Data.FatEven = outParams.Fat_bipolar_even(:,:,sl);
-    Data.TotalFieldDualGC = outParams.FieldMap_DualGC(:,:,sl);
-    Data.R2StarDualGC = outParams.R2_DualGC(:,:,sl);
+    % Data.WaterOdd = outParams.Water_bipolar_odd(:,:,sl);
+    % Data.FatOdd = outParams.Fat_bipolar_odd(:,:,sl);
+    % Data.WaterEven = outParams.Water_bipolar_even(:,:,sl);
+    % Data.FatEven = outParams.Fat_bipolar_even(:,:,sl);
+    % Data.TotalFieldDualGC = outParams.FieldMap_DualGC(:,:,sl);
+    % Data.R2StarDualGC = outParams.R2_DualGC(:,:,sl);
 
     % Solver statistics, kept out of Data so that CSC.assemble stacks them as
     % metadata rather than as images
