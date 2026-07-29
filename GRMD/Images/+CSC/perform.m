@@ -76,17 +76,17 @@ function D = perform(D, flags)
             D.Data.Fat = outParams.species(2).amps;
             D.Data.TotalField = outParams.fieldmap;
             D.Data.R2Star = outParams.r2starmap;
-            D.Data.Phi = outParams.phi_map; % related to phase modulation due to bipolar readout
-            D.Data.Epsilon = outParams.eps_map; % related to amplitude modulation due to bipolar readout
+            % D.Data.Phi = outParams.phi_map; % related to phase modulation due to bipolar readout
+            % D.Data.Epsilon = outParams.eps_map; % related to amplitude modulation due to bipolar readout
             D.Data.BipolarError = outParams.bipolar_error_map_theta; % phi - i*eps;
             D.Data.Correction = outParams.total_correction; % correction to remove bipolar induced effects, e^(i*BipolarError)
             
-            D.Data.WaterOdd = outParams.Water_bipolar_odd;
-            D.Data.FatOdd = outParams.Fat_bipolar_odd;
-            D.Data.WaterEven = outParams.Water_bipolar_even;
-            D.Data.FatEven = outParams.Fat_bipolar_even;
-            D.Data.TotalFieldDualGC = outParams.FieldMap_DualGC;
-            D.Data.R2StarDualGC = outParams.R2_DualGC;
+            % D.Data.WaterOdd = outParams.Water_bipolar_odd;
+            % D.Data.FatOdd = outParams.Fat_bipolar_odd;
+            % D.Data.WaterEven = outParams.Water_bipolar_even;
+            % D.Data.FatEven = outParams.Fat_bipolar_even;
+            % D.Data.TotalFieldDualGC = outParams.FieldMap_DualGC;
+            % D.Data.R2StarDualGC = outParams.R2_DualGC;
 
         case 'vlGC'
             % Check parameters
