@@ -22,8 +22,11 @@ function snr_thresh = snrThreshold(D, flags)
 
     % Set SNR threshold
     % Note: sum over coils (dim 4) and echoes (dim 5) to match the magnitude
-    % definition in Function_Bipolar_GC's mask generation.
+    % definition in Function_Bipolar_GC's mask generation. The fat-water
+    % separation mask is applied here as well, and the maximum is still taken
+    % over the whole volume, so that this matches the threshold a whole-volume
+    % run computes internally.
     mag = squeeze(sqrt(sum(abs(images).^2, [4 5])));
-    mask_mag = mag > 0.1*max(mag(:));
+    mask_mag = D.Data.Mask & mag > 0.1*max(mag(:));
     snr_thresh = prctile(mag(mask_mag),25);
 end

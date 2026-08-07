@@ -54,7 +54,9 @@ function [D, Data, Stats] = performSlice(D, flags, sl, snr_thresh)
     % Grab extra parameters
     dataParams.voxelSize = D.VoxelSize;
     dataParams.images = images;
-    dataParams.mask_fwseparation = 1;
+    % Note: the whole volume, not just slice sl, since Function_Bipolar_GC
+    % indexes the mask by slice itself
+    dataParams.mask_fwseparation = D.Data.Mask;
 
     outParams = Function_Bipolar_GC(dataParams, algoParams, sl, verboseFLAG);
 

@@ -60,7 +60,7 @@ function D = perform(D, flags)
             dataParams.FieldStrength = D.B0;
             dataParams.voxelSize = D.VoxelSize;
             dataParams.images = images;
-            dataParams.mask_fwseparation = 1;
+            dataParams.mask_fwseparation = D.Data.Mask;
 
             outParams = Function_Bipolar_GC(dataParams, algoParams, 1:D.Size(3), verboseFLAG);
             
